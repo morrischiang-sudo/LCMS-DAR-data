@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DAR Compass — User Guide</title>
+<style>
+  :root {
+    --navy: #1B2A4A;
+    --teal: #2A8C82;
+    --teal-light: #E4F3F1;
+    --amber: #C55A11;
+    --amber-light: #FCE4D6;
+    --ink: #24303F;
+    --muted: #5B6B7C;
+    --border: #E1E6EC;
+    --bg: #F7F9FB;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.6;
+  }
+  header.hero {
+    background: linear-gradient(135deg, var(--navy), #2E4570);
+    color: white;
+    padding: 56px 24px 44px;
+    text-align: center;
+  }
+  header.hero .icon { font-size: 48px; display: block; margin-bottom: 8px; }
+  header.hero h1 { margin: 0; font-size: 2.2rem; letter-spacing: 0.3px; }
+  header.hero p { margin: 10px auto 0; max-width: 560px; color: #C9D4E6; font-size: 1.05rem; }
+  header.hero .badge {
+    display: inline-block; margin-top: 18px; padding: 6px 14px;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px; font-size: 0.85rem; color: #DCE6F5;
+  }
+
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px 80px; }
+
+  nav.toc {
+    background: white; border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 24px; margin: -28px 0 40px; box-shadow: 0 6px 18px rgba(27,42,74,0.08);
+  }
+  nav.toc h2 { margin: 0 0 10px; font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 24px; }
+  nav.toc li { margin-bottom: 6px; }
+  nav.toc a { color: var(--navy); text-decoration: none; font-weight: 500; }
+  nav.toc a:hover { color: var(--teal); text-decoration: underline; }
+
+  section { margin-bottom: 48px; }
+  section h2 {
+    font-size: 1.5rem; color: var(--navy); border-bottom: 3px solid var(--teal);
+    display: inline-block; padding-bottom: 4px; margin-bottom: 18px;
+  }
+  section h3 { font-size: 1.1rem; color: var(--navy); margin: 24px 0 8px; }
+  p { margin: 0 0 14px; }
+
+  .card {
+    background: white; border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px 22px; margin-bottom: 16px; box-shadow: 0 2px 6px rgba(27,42,74,0.04);
+  }
+
+  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  .steps > li {
+    counter-increment: step;
+    position: relative;
+    background: white; border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 22px 18px 62px; margin-bottom: 14px;
+    box-shadow: 0 2px 6px rgba(27,42,74,0.04);
+  }
+  .steps > li::before {
+    content: counter(step);
+    position: absolute; left: 18px; top: 18px;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--teal); color: white; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
+  }
+  .steps > li h3 { margin-top: 0; }
+  .steps > li p:last-child { margin-bottom: 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  th { background: var(--teal-light); color: var(--navy); font-weight: 600; }
+  code {
+    background: #EEF1F5; padding: 2px 6px; border-radius: 4px; font-size: 0.9em;
+    font-family: "SF Mono", Consolas, Menlo, monospace; color: #2E4570;
+  }
+  pre {
+    background: #1B2A4A; color: #DCE6F5; padding: 14px 16px; border-radius: 8px;
+    overflow-x: auto; font-size: 0.88rem;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  .callout {
+    border-left: 4px solid var(--teal); background: var(--teal-light);
+    padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 16px 0;
+  }
+  .callout.warn { border-left-color: var(--amber); background: var(--amber-light); }
+  .callout strong { color: var(--navy); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) {
+    .grid2 { grid-template-columns: 1fr; }
+    nav.toc ol { columns: 1; }
+  }
+
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  .faq dt { font-weight: 600; color: var(--navy); margin-top: 16px; }
+  .faq dd { margin: 6px 0 0; color: var(--ink); }
+
+  footer {
+    text-align: center; color: var(--muted); font-size: 0.85rem;
+    padding: 30px 24px 60px;
+  }
+  footer a { color: var(--teal); }
+
+  a.top { font-size: 0.85rem; text-decoration: none; color: var(--teal); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <span class="icon">🧭</span>
+  <h1>DAR Compass</h1>
+  <p>Automated Drug-to-Antibody Ratio (DAR) distribution analysis for antibody-drug conjugates — from raw LC-MS deconvolution export to a validated DAR report, without manual spreadsheet matching.</p>
+  <span class="badge">User Guide</span>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc" id="top">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#overview">1. What DAR Compass does</a></li>
+      <li><a href="#before-you-start">2. Before you start</a></li>
+      <li><a href="#walkthrough">3. Step-by-step walkthrough</a></li>
+      <li><a href="#results">4. Understanding your results</a></li>
+      <li><a href="#tips">5. Tips for reliable results</a></li>
+      <li><a href="#troubleshooting">6. Troubleshooting</a></li>
+      <li><a href="#running">7. Running the app</a></li>
+      <li><a href="#more">8. Where to learn more</a></li>
+    </ol>
+  </nav>
+
+  <section id="overview">
+    <h2>1. What DAR Compass does</h2>
+    <p>
+      DAR Compass takes two LC-MS deconvolution exports — one for your naked (unconjugated) mAb reference and
+      one for the ADC — and automatically works out the Drug-to-Antibody Ratio (DAR) distribution, the same
+      way it would be done by hand in a spreadsheet, but without the manual peak-by-peak matching.
+    </p>
+    <p>It runs three steps automatically:</p>
+    <div class="card">
+      <strong>1. Build a theoretical mass ladder.</strong> Using your mAb's observed mass and the linker-payload
+      MW(s) you specify, it calculates every possible combination of "mAb + n payloads" you tell it to consider.
+      <br><br>
+      <strong>2. Match observed peaks.</strong> Every peak in your ADC file is compared against that ladder and
+      assigned to its closest theoretical species — but only if it's within the mass-accuracy tolerance you set.
+      Peaks that don't fit anywhere (fragments, adducts, noise) are automatically excluded.
+      <br><br>
+      <strong>3. Calculate DAR.</strong> Each matched species is weighted by its relative intensity, multiplied
+      by its payload count, and summed — giving you a DAR value per payload type and a Total DAR.
+    </div>
+    <p>
+      Peaks that could plausibly match more than one species within tolerance are flagged as
+      <strong>ambiguous</strong> rather than silently resolved, so you can review them before trusting the number.
+    </p>
+  </section>
+
+  <section id="before-you-start">
+    <h2>2. Before you start</h2>
+    <h3>What files you need</h3>
+    <p>Two Excel (<code>.xlsx</code>) files, each a deconvoluted intact-mass export (e.g. from Thermo BioPharma
+      Finder or similar deconvolution software):</p>
+    <table>
+      <tr><th>File</th><th>What it is</th><th>Required columns</th></tr>
+      <tr><td>mAb reference export</td><td>Naked, unconjugated antibody — same molecule, no payload</td><td><code>Average Mass</code>, <code>Sum Intensity</code></td></tr>
+      <tr><td>ADC export</td><td>The conjugated sample you want the DAR for</td><td><code>Average Mass</code>, <code>Sum Intensity</code></td></tr>
+    </table>
+    <div class="callout">
+      <strong>Why the mAb file matters:</strong> its most abundant observed mass becomes the "base mass" that all
+      theoretical ADC species are built from. This captures natural glycoform/adduct variation in the antibody
+      itself, separate from payload conjugation.
+    </div>
+    <h3>What you need to know before opening the app</h3>
+    <ul>
+      <li>The <strong>MW of every linker-payload chemistry</strong> used on this molecule (in Da).</li>
+      <li>The <strong>maximum number of conjugation sites</strong> for each chemistry (e.g. up to 8 for interchain-cysteine conjugation).</li>
+      <li>Whether conjugation happens <strong>one at a time or only in pairs</strong> (e.g. per disulfide bond) — this sets the count step (1 or 2).</li>
+    </ul>
+  </section>
+
+  <section id="walkthrough">
+    <h2>3. Step-by-step walkthrough</h2>
+    <ol class="steps">
+      <li>
+        <h3>Upload your two files</h3>
+        <p>In the sidebar, upload the mAb reference export and the ADC export. Both must be <code>.xlsx</code>
+          files with at least <code>Average Mass</code> and <code>Sum Intensity</code> columns — the app checks
+          this automatically and will tell you if a required column is missing.</p>
+      </li>
+      <li>
+        <h3>Set the number of linker-payload chemistries</h3>
+        <p>Most ADCs use one payload chemistry; some use two (e.g. a dual-payload or mixed-conjugation design).
+          Set the count, then an expandable panel appears for each one.</p>
+      </li>
+      <li>
+        <h3>Configure each chemistry</h3>
+        <p>For each payload chemistry: tick <strong>Include in analysis</strong>, give it a short label (e.g.
+          <code>4</code>, <code>12</code>, or a payload name), enter its <strong>MW in Da</strong>, its
+          <strong>maximum conjugation count</strong>, and whether counts step by 1 or 2.</p>
+      </li>
+      <li>
+        <h3>Set the ADC fractional abundance threshold (optional)</h3>
+        <p>Before any mass matching happens, you can raise this threshold (%) to drop very low-abundance ADC
+          peaks — noise, minor adducts, trace contaminants — from consideration entirely. Only peaks at or above
+          the threshold become "candidate" species. Leave it at <code>0</code> (the default) to consider every
+          peak in the file, which is the safest starting point; raise it only if you're seeing a lot of
+          low-abundance clutter in your results.</p>
+      </li>
+      <li>
+        <h3>Set the mass accuracy tolerance</h3>
+        <p>The ppm tolerance controls how far an observed mass can be from a theoretical mass and still count as
+          a match. 250–350 ppm reproduced manually-curated results for ~150–165 kDa intact ADC species during
+          validation — start there and adjust based on your own instrument/method performance.</p>
+      </li>
+      <li>
+        <h3>Choose how many mAb base masses to use</h3>
+        <p><strong>Most abundant only</strong> (recommended) anchors everything to the single dominant mAb mass.
+          <strong>Top N variants</strong> includes minor glycoform/adduct masses too — useful for exploratory runs,
+          but can introduce ambiguous matches if those variants are close in mass to each other.</p>
+      </li>
+      <li>
+        <h3>Click "Run DAR analysis"</h3>
+        <p>Results appear in the main panel: DAR metrics, a distribution chart, a matched-species table, and
+          download buttons.</p>
+      </li>
+      <li>
+        <h3>Review anything flagged ambiguous</h3>
+        <p>If any matched peak could plausibly belong to more than one species within your tolerance, it's
+          highlighted in the table and counted in a warning banner. Check these before reporting the DAR value.</p>
+      </li>
+      <li>
+        <h3>Download your report</h3>
+        <p>Use the download buttons to save the DAR report as an Excel file (summary + full matched-species
+          table) and the distribution chart as a PNG, for your records or an ELN/LIMS entry.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section id="results">
+    <h2>4. Understanding your results</h2>
+    <div class="grid2">
+      <div class="card">
+        <h3 style="margin-top:0;">DAR metrics</h3>
+        <p>One metric per payload chemistry (e.g. <code>DAR [4]</code>, <code>DAR [12]</code>) plus
+          <strong>Total DAR</strong>, the sum across all chemistries — matching the standard intensity-weighted
+          calculation: relative abundance × payload count, summed across matched species.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Distribution chart</h3>
+        <p>Bars show relative abundance per matched species, sorted highest to lowest.
+          <span class="swatch" style="background:#4472C4;"></span>Blue bars are unambiguous matches;
+          <span class="swatch" style="background:#C55A11;"></span>orange bars are ambiguous and worth a closer look.</p>
+      </div>
+    </div>
+    <h3>Matched species table</h3>
+    <p>Every accepted peak, its assigned species, mass accuracy (ppm), relative abundance, and payload counts.
+      Rows shaded light orange are ambiguous — the <code>runner_up_species</code> and
+      <code>runner_up_ppm_error</code> columns show the next-closest alternative so you can judge which is more
+      plausible.</p>
+    <div class="callout warn">
+      <strong>An ambiguous flag doesn't mean the match is wrong</strong> — it means two labels were both
+      mathematically plausible within your tolerance. Narrower tolerance, or excluding minor mAb mass variants
+      from the base-mass set, usually resolves most of these.
+    </div>
+  </section>
+
+  <section id="tips">
+    <h2>5. Tips for reliable results</h2>
+    <ul>
+      <li><strong>Start with "Most abundant only"</strong> for the base mass setting. Add more variants only if
+        you specifically need to account for minor glycoforms and you're seeing unmatched major peaks.</li>
+      <li><strong>Don't chase &lt;20 ppm.</strong> For intact species in the 150–165 kDa range, 100–300 ppm is
+        normal instrument/deconvolution performance — a tolerance that's too tight will simply drop real
+        species rather than improve accuracy.</li>
+      <li><strong>If nothing matches</strong>, widen the tolerance gradually rather than jumping straight to a
+        very large number — that makes it easier to spot when unrelated species start getting pulled in.</li>
+      <li><strong>Keep the fractional abundance threshold at 0 by default.</strong> It's a coarse pre-filter,
+        not a replacement for the ppm tolerance. Raise it only when you can see specific low-abundance peaks
+        cluttering your results and want them excluded before matching even happens — otherwise you risk
+        dropping a real, low-intensity minor species along with the noise.</li>
+      <li><strong>Cross-check Total DAR against expectation.</strong> If your conjugation chemistry caps out at,
+        say, 8 sites, a Total DAR far outside a plausible range is a sign to review the ambiguous matches or
+        reconsider the payload/MW inputs.</li>
+    </ul>
+  </section>
+
+  <section id="troubleshooting">
+    <h2>6. Troubleshooting</h2>
+    <dl class="faq">
+      <dt>"Please upload both a mAb reference file and an ADC file"</dt>
+      <dd>Both file slots in the sidebar need a file before you click Run — check neither was left empty.</dd>
+
+      <dt>"...is missing expected column(s)"</dt>
+      <dd>Your export doesn't have an <code>Average Mass</code> or <code>Sum Intensity</code> column with that
+        exact name. Check your deconvolution software's export settings, or rename the columns to match.</dd>
+
+      <dt>"No ADC peaks remain at this fractional abundance threshold"</dt>
+      <dd>Your fractional abundance threshold filtered out every peak in the file before matching even started.
+        Lower it — most files won't need it set above a fraction of a percent.</dd>
+
+      <dt>"No peaks matched at this tolerance"</dt>
+      <dd>Increase the ppm tolerance slider. If that doesn't help, double-check your payload MW values and
+        maximum conjugation counts — a wrong MW will mean no theoretical mass ever lines up with your data.
+        Also confirm the fractional abundance threshold isn't set higher than intended.</dd>
+
+      <dt>Total DAR looks too high or too low</dt>
+      <dd>Check for ambiguous matches first. If none, confirm the count step (1 vs 2) matches your conjugation
+        chemistry, and that "Max conjugation count" is set high enough to cover your ADC's expected range.</dd>
+    </dl>
+  </section>
+
+  <section id="running">
+    <h2>7. Running the app</h2>
+    <h3>On your own computer</h3>
+    <pre><code>pip install -r requirements.txt
+streamlit run app.py</code></pre>
+    <p>This opens DAR Compass in your browser at <code>http://localhost:8501</code>.</p>
+    <h3>Shared on the team network</h3>
+    <pre><code>pip install -r requirements.txt
+streamlit run app.py --server.address 0.0.0.0 --server.port 8501</code></pre>
+    <p>Anyone on the same network can then reach it at <code>http://&lt;server-hostname&gt;:8501</code>. For
+      anything beyond same-network access, loop in IT for a proper reverse proxy / login setup.</p>
+  </section>
+
+  <section id="more">
+    <h2>8. Where to learn more</h2>
+    <p>
+      <code>DAR_platform_strategy_summary.md</code> covers the underlying methodology in more depth: how the
+      manual spreadsheet workflow was reviewed, the specific issues found in it, how the matching algorithm was
+      validated against real data, and the platform design reasoning behind DAR Compass's UI choices.
+    </p>
+    <p><code>README.md</code> has the same quick-start instructions as section 7 above, plus a list of known
+      limitations and planned next steps (fragment/subunit-ion cross-validation, run history, authentication).</p>
+  </section>
+
+  <p><a class="top" href="#top">↑ Back to top</a></p>
+</div>
+
+<footer>
+  DAR Compass — internal preclinical ADC analysis tool.
+</footer>
+
+</body>
+</html>
