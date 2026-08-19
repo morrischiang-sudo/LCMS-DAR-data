@@ -24,6 +24,41 @@ Anyone on the same network can then reach it at `http://<server-hostname>:8501`.
 For anything beyond a same-network share (e.g. VPN-only access, login-gated access),
 loop in IT/infrastructure to put it behind your usual reverse proxy / SSO setup.
 
+## Deploying on Render (public URL, e.g. to share with a colleague outside the network)
+
+Render can host this as a normal Python web service. Feasibility-wise there's nothing
+unusual here — pandas/numpy/matplotlib/openpyxl are all plain wheels, and the app never
+writes anything to disk (uploads and results are handled entirely in memory for that
+session), so Render's ephemeral filesystem isn't a problem.
+
+**Before deploying:** Render gives every web service a public `onrender.com` URL with
+no built-in login — anyone with the link can open it. Since this handles proprietary
+ADC data, the app includes an optional password gate (see below) that's strongly
+recommended once it's on a public URL, even if you only ever share the link with one
+colleague.
+
+1. Push this folder to the GitHub (or GitLab/Bitbucket) repo you're using for the project.
+2. In the [Render dashboard](https://dashboard.render.com), choose **New > Blueprint**
+   and point it at that repo — Render will read `render.yaml` in this folder and
+   pre-fill the service config (Python runtime, build/start commands, free plan).
+   - Prefer clicking through manually instead? Choose **New > Web Service**, connect
+     the repo, and set: **Build Command** `pip install -r requirements.txt`,
+     **Start Command** `streamlit run app.py --server.port $PORT --server.address 0.0.0.0`.
+3. When prompted for the `APP_PASSWORD` environment variable, enter a password to
+   share with your colleague (Render stores it as a secret, not in the repo).
+4. Deploy. You'll get a `https://dar-compass-xxxx.onrender.com`-style URL — share that
+   plus the password with your colleague, and nothing else public.
+
+**Plan choice:** the Free instance (in `render.yaml`) spins down after 15 minutes of
+no traffic and takes about a minute to spin back up on the next request — fine for
+occasional use, but noticeable if your colleague opens it cold. Change `plan: free` to
+`plan: starter` in `render.yaml` ($7/month) if that cold start becomes annoying; it
+removes the spin-down entirely with the same 512 MB RAM.
+
+If your organization has a policy on hosting internal R&D data on third-party cloud
+services (even transiently, in memory), it's worth confirming this is fine before
+deploying — that's a compliance question, not a technical one.
+
 ## How to use it
 
 1. Upload the naked mAb reference deconvolution export (`.xlsx`) and the ADC
@@ -48,9 +83,11 @@ loop in IT/infrastructure to put it behind your usual reverse proxy / SSO setup.
 
 ## Files in this delivery
 
-- `app.py` — the Streamlit UI
+- `app.py` — the Streamlit UI (includes an optional `APP_PASSWORD`-gated login, active only
+  when that environment variable/secret is set — see the Render section above)
 - `dar_calculator.py` — the underlying matching/DAR engine (also usable standalone/scripted)
 - `requirements.txt` — pinned dependencies
+- `render.yaml` — Render Blueprint for one-step deployment (see Render section above)
 - `DAR_platform_strategy_summary.md` — the workflow review, validation results, and
   platform design recommendations this app implements
 - `results_A090412.xlsx`, `results_A090512.xlsx`, `results_A090412_from_raw_files.xlsx`,
@@ -65,5 +102,6 @@ loop in IT/infrastructure to put it behind your usual reverse proxy / SSO setup.
 - No persistence/database yet — each run is stateless. If the team wants a history
   of past runs, that's a natural next feature (e.g. SQLite or a shared folder of
   saved reports).
-- No authentication. Fine for a same-network internal tool; add if this grows beyond
-  the immediate team or the data becomes more sensitive.
+- Authentication is a single shared password (via `APP_PASSWORD`), not per-user login.
+  Fine for sharing with one or two named colleagues; if this grows to a bigger audience
+  or needs individual accounts/audit trail, revisit with a real auth solution.

@@ -337,6 +337,13 @@ streamlit run app.py</code></pre>
 streamlit run app.py --server.address 0.0.0.0 --server.port 8501</code></pre>
     <p>Anyone on the same network can then reach it at <code>http://&lt;server-hostname&gt;:8501</code>. For
       anything beyond same-network access, loop in IT for a proper reverse proxy / login setup.</p>
+    <h3>Shared publicly online (e.g. Render)</h3>
+    <p>DAR Compass can also be deployed on a hosting service like <a href="https://render.com" target="_blank" rel="noopener">Render</a>
+      to get a public URL for sharing with an outside colleague — see the "Deploying on Render" section of
+      <code>README.md</code> for step-by-step instructions, including the <code>render.yaml</code> config
+      included in this delivery. Because a public URL has no built-in login, the app includes an optional
+      password gate (set via an <code>APP_PASSWORD</code> environment variable) that's strongly recommended
+      once it's off your local network.</p>
   </section>
 
   <section id="more">

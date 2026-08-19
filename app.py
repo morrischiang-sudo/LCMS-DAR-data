@@ -10,6 +10,7 @@ Run with:
 from __future__ import annotations
 
 import io
+import os
 
 import matplotlib
 matplotlib.use("Agg")
@@ -31,6 +32,48 @@ APP_TITLE = "DAR Compass"
 APP_TAGLINE = "Automated DAR distribution analysis for antibody-drug conjugates"
 
 st.set_page_config(page_title=APP_TITLE, page_icon="\U0001F9ED", layout="wide")
+
+
+# --------------------------------------------------------------------------
+# Access gate
+# --------------------------------------------------------------------------
+# Enforced only if an APP_PASSWORD is configured (e.g. as a Render
+# environment variable / secret). Local development with no APP_PASSWORD
+# set runs ungated, so this never gets in the way of local iteration -
+# it only matters once the app is deployed somewhere with a public URL.
+
+def _get_app_password() -> str | None:
+    pw = os.environ.get("APP_PASSWORD")
+    if pw:
+        return pw
+    try:
+        return st.secrets["APP_PASSWORD"]
+    except Exception:
+        return None
+
+
+def _require_password() -> None:
+    expected = _get_app_password()
+    if not expected:
+        return  # no password configured - nothing to gate
+
+    if st.session_state.get("_authenticated"):
+        return
+
+    st.title(f"\U0001F9ED {APP_TITLE}")
+    st.caption(APP_TAGLINE)
+    st.info("This app is password-protected. Ask whoever shared the link with you for the password.")
+    pw = st.text_input("Password", type="password", key="_password_input")
+    if st.button("Enter", type="primary"):
+        if pw == expected:
+            st.session_state["_authenticated"] = True
+            st.rerun()
+        else:
+            st.error("Incorrect password.")
+    st.stop()
+
+
+_require_password()
 
 
 # --------------------------------------------------------------------------

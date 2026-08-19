@@ -1,0 +1,25 @@
+# Render Blueprint for DAR Compass.
+#
+# Using this file (Infrastructure as Code) instead of manually clicking
+# through the Render dashboard: push it to the repo root, then in Render
+# choose "New > Blueprint" and point it at this repo. Render reads this
+# file and creates/configures the service for you.
+#
+# Docs: https://render.com/docs/infrastructure-as-code
+#
+# NOTE: APP_PASSWORD is marked sync: false, which means Render will prompt
+# you to enter its value in the dashboard rather than storing it in this
+# file (so the password never ends up committed to git).
+
+services:
+  - type: web
+    name: dar-compass
+    runtime: python
+    plan: free  # bump to "starter" ($7/mo) to remove the free-tier spin-down/cold-start
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: APP_PASSWORD
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.9
