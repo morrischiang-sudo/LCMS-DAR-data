@@ -3,3 +3,6 @@
 ~$*.pptx
 __pycache__/
 *.pyc
+
+# Real sample/validation data - kept local only, never pushed to GitHub
+Training database DAR/
