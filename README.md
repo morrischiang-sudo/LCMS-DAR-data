@@ -99,15 +99,26 @@ deploying — that's a compliance question, not a technical one.
    than one plausible species within tolerance) before trusting the reported
    DAR — this is the automated version of the "does this look right?" check
    that used to be a manual judgment call.
-6. If any chemistry has more than one mass variant configured, a **Chart detail**
-   toggle appears above the distribution chart: **Detailed** shows every intact/
-   broken mixture as its own bar (precise, but can get crowded); **Consolidated**
-   groups bars by total occupied-site count per chemistry only, hiding which
-   specific variant(s) made up that total. This only changes the chart — the
-   table and DAR numbers are identical either way. Results stay on screen while
-   you switch this (or any other widget) back and forth; only clicking
-   **Run DAR analysis** again recomputes them.
-7. Download the DAR report (Excel) and chart (PNG) for your records.
+6. Check the **Drug-load distribution** table and chart: one row/panel per
+   chemistry, one column per count (0, 1, 2, ...), showing the % of matched
+   intensity at each count independent of the other chemistries, plus an
+   Average column (the same DAR number as the metric above). This is the
+   standard drug-load-distribution report format — one row per linker-payload,
+   blank cells where a count is outside that chemistry's configured range,
+   the modal count highlighted. If a chemistry has a mass variant with a
+   DAR weight other than 1.0, a note explains why the row's simple mean
+   won't exactly equal the Average column.
+7. If any chemistry has more than one mass variant configured, a **Chart detail**
+   toggle also appears above the species-level distribution chart further down:
+   **Detailed** shows every intact/broken mixture as its own bar (precise, but
+   can get crowded); **Consolidated** groups bars by total occupied-site count
+   per chemistry only, hiding which specific variant(s) made up that total.
+   This only changes that chart — the table and DAR numbers are identical
+   either way. Results stay on screen while you switch this (or any other
+   widget) back and forth; only clicking **Run DAR analysis** again recomputes
+   them.
+8. Download the DAR report (Excel, now including the drug-load distribution
+   as its own sheet) and both charts (PNG) for your records.
 
 ## Files in this delivery
 

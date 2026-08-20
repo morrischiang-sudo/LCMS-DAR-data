@@ -408,6 +408,74 @@ def consolidate_by_total_count(
     return grouped.sort_values(intensity_col, ascending=False).reset_index(drop=True)
 
 
+def marginal_distribution_by_chemistry(
+    matched_df: pd.DataFrame,
+    payload_defs: Sequence[PayloadDef],
+    intensity_col: str = "Sum Intensity",
+) -> pd.DataFrame:
+    """Per-chemistry drug-load distribution: the % of total matched
+    intensity at each total occupied-site count, for one chemistry at a
+    time, independent of every other chemistry's count.
+
+    This is the standard "drug-load distribution" report format (one row
+    per linker-payload, one column per count 0..max, plus an average) -
+    distinct from `consolidate_by_total_count`, which groups by the joint
+    combination of every chemistry's count together rather than one
+    chemistry at a time.
+
+    Every count configured in a chemistry's `n_values` gets an explicit row
+    (0.0 if nothing matched there), so a count that's in range but simply
+    unobserved still shows as 0, while a count outside that chemistry's
+    configured range doesn't appear at all - matching how a report table
+    would leave truly out-of-range cells blank rather than showing 0.
+
+    Returns a long-format dataframe: columns
+    ['chemistry', 'count', 'relative_abundance_pct'].
+    """
+    rows = []
+    for p in payload_defs:
+        col = f"n_{p.label}_total" if len(p.variants) > 1 else f"n_{p.variants[0].variant_label}"
+        if matched_df.empty or col not in matched_df.columns:
+            grouped = {}
+        else:
+            grouped = matched_df.groupby(col)["relative_abundance"].sum().to_dict()
+        for n in p.n_values:
+            rows.append({
+                "chemistry": p.label,
+                "count": int(n),
+                "relative_abundance_pct": grouped.get(n, 0.0) * 100,
+            })
+    return pd.DataFrame(rows)
+
+
+def build_drug_load_summary_table(
+    matched_df: pd.DataFrame,
+    payload_defs: Sequence[PayloadDef],
+    dar: dict,
+) -> pd.DataFrame:
+    """Wide-format drug-load distribution table: one row per chemistry,
+    one column per count, plus an 'Average' column.
+
+    'Average' is taken directly from `calculate_dar`'s DAR value for that
+    chemistry (the same number shown in the app's top-line metrics), not
+    recomputed from this table's own counts - the two agree exactly when
+    every mass variant's `dar_weight` is 1.0 (the default), and can differ
+    when a variant has a lower/zero DAR weight, since this table's counts
+    are total occupied sites regardless of variant, while DAR discounts
+    variants that don't fully count as a payload.
+    """
+    long_df = marginal_distribution_by_chemistry(matched_df, payload_defs)
+    if long_df.empty:
+        return pd.DataFrame()
+
+    pivot = long_df.pivot_table(index="chemistry", columns="count", values="relative_abundance_pct")
+    pivot = pivot.reindex(sorted(pivot.columns), axis=1)
+    pivot = pivot.reindex([p.label for p in payload_defs])
+    pivot.columns = [str(c) for c in pivot.columns]  # numeric-sorted first, then stringified for display/export
+    pivot["Average"] = [dar.get(label, float("nan")) for label in pivot.index]
+    return pivot
+
+
 # --------------------------------------------------------------------------
 # High-level convenience wrapper
 # --------------------------------------------------------------------------

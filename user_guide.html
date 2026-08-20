@@ -255,12 +255,20 @@
       </li>
       <li>
         <h3>Click "Run DAR analysis"</h3>
-        <p>Results appear in the main panel: DAR metrics, a distribution chart, a matched-species table, and
-          download buttons. Once shown, results stay on screen while you interact with the chart-detail toggle
-          or any other widget — only clicking "Run DAR analysis" again recomputes them.</p>
+        <p>Results appear in the main panel: DAR metrics, a drug-load distribution table and chart, a
+          species-level distribution chart, a matched-species table, and download buttons. Once shown, results
+          stay on screen while you interact with the chart-detail toggle or any other widget — only clicking
+          "Run DAR analysis" again recomputes them.</p>
       </li>
       <li>
-        <h3>Toggle chart detail (only shown if a chemistry has multiple mass variants)</h3>
+        <h3>Review the drug-load distribution table and chart</h3>
+        <p>One row (and one chart panel) per chemistry, showing the % of matched intensity at each individual
+          count — independent of the other chemistries — plus an Average column matching the DAR metric above.
+          This is the standard report format: blank cells for counts outside that chemistry's configured range,
+          and the modal (most abundant) count highlighted, same as you'd see in a characterization slide.</p>
+      </li>
+      <li>
+        <h3>Toggle chart detail on the species-level chart (only shown if a chemistry has multiple mass variants)</h3>
         <p><strong>Detailed</strong> shows every intact/broken mixture as its own bar — precise, but can get
           crowded once a chemistry has multiple mass variants. <strong>Consolidated</strong> groups bars by
           total occupied-site count per chemistry only, hiding which specific variant(s) made up that total.
@@ -273,8 +281,9 @@
       </li>
       <li>
         <h3>Download your report</h3>
-        <p>Use the download buttons to save the DAR report as an Excel file (summary + full matched-species
-          table) and the distribution chart as a PNG, for your records or an ELN/LIMS entry.</p>
+        <p>Use the download buttons to save the DAR report as an Excel file (summary + drug-load distribution +
+          full matched-species table, each on its own sheet) and both charts as PNGs, for your records or an
+          ELN/LIMS entry.</p>
       </li>
     </ol>
   </section>

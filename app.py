@@ -22,12 +22,14 @@ from dar_calculator import (
     MassVariant,
     PayloadDef,
     base_masses_from_mab,
+    build_drug_load_summary_table,
     build_theoretical_table,
     calculate_dar,
     consolidate_by_total_count,
     estimate_theoretical_grid_size,
     filter_by_fractional_abundance,
     load_deconvolution_file,
+    marginal_distribution_by_chemistry,
     match_species,
 )
 
@@ -111,10 +113,46 @@ def make_distribution_chart(matched_df: pd.DataFrame, dar: dict, payload_labels:
     return fig
 
 
-def to_excel_bytes(summary_df: pd.DataFrame, species_df: pd.DataFrame) -> bytes:
+def make_drug_load_chart(long_df: pd.DataFrame, payload_defs: list[PayloadDef], dar: dict):
+    n_chem = max(len(payload_defs), 1)
+    fig, axes = plt.subplots(1, n_chem, figsize=(5.5 * n_chem, 4.5))
+    if n_chem == 1:
+        axes = [axes]
+    for ax, p in zip(axes, payload_defs):
+        sub = long_df[long_df["chemistry"] == p.label].sort_values("count")
+        counts = sub["count"].tolist()
+        pcts = sub["relative_abundance_pct"].tolist()
+        colors = ["#2A8C82"] * len(pcts)
+        if pcts:
+            colors[pcts.index(max(pcts))] = "#1B2A4A"  # highlight the mode, matching the reference report style
+        ax.bar([str(c) for c in counts], pcts, color=colors)
+        ax.set_xlabel(f"{p.label} count")
+        ax.set_ylabel("Relative abundance (%)")
+        ax.set_title(f"{p.label}\nAverage = {dar.get(p.label, float('nan')):.2f}")
+    plt.tight_layout()
+    return fig
+
+
+def style_drug_load_table(table: pd.DataFrame):
+    count_cols = [c for c in table.columns if c != "Average"]
+
+    def highlight_mode(row):
+        styles = [""] * len(row)
+        vals = row[count_cols].dropna()
+        if len(vals):
+            mode_col = vals.idxmax()
+            styles[list(row.index).index(mode_col)] = "background-color: #CFE2F3; font-weight: bold; color: #1B2A4A;"
+        return styles
+
+    return table.style.apply(highlight_mode, axis=1).format("{:.2f}", na_rep="")
+
+
+def to_excel_bytes(summary_df: pd.DataFrame, species_df: pd.DataFrame, drug_load_df: pd.DataFrame | None = None) -> bytes:
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         summary_df.to_excel(writer, sheet_name="DAR Summary", index=False)
+        if drug_load_df is not None and not drug_load_df.empty:
+            drug_load_df.to_excel(writer, sheet_name="Drug-load Distribution")
         species_df.to_excel(writer, sheet_name="Matched Species", index=False)
     return buf.getvalue()
 
@@ -356,8 +394,36 @@ if n_ambiguous:
         "Review the highlighted rows below before trusting the DAR value."
     )
 
+# --- Drug-load distribution (per-chemistry summary table + chart) --------
+st.subheader("Drug-load distribution")
+st.caption(
+    "Percent of matched intensity at each individual count, per chemistry - independent of the other "
+    "chemistries' counts. This is the standard drug-load-distribution report format (one row per "
+    "linker-payload, one column per count, plus an average)."
+)
+
+drug_load_long = marginal_distribution_by_chemistry(matched_with_contrib, payload_defs)
+drug_load_table = build_drug_load_summary_table(matched_with_contrib, payload_defs, dar)
+
+has_nondefault_dar_weight = any(v.dar_weight != 1.0 for p in payload_defs for v in p.variants)
+if has_nondefault_dar_weight:
+    st.caption(
+        "Note: at least one mass variant has a DAR weight other than 1.0. \"Average\" is each "
+        "chemistry's actual DAR (weighted by dar_weight, same number as the metric above) - it will "
+        "differ from the simple mean of the row above it, which counts every occupied site equally "
+        "regardless of variant."
+    )
+
+if not drug_load_table.empty:
+    st.dataframe(style_drug_load_table(drug_load_table), use_container_width=True)
+    drug_load_fig = make_drug_load_chart(drug_load_long, payload_defs, dar)
+    st.pyplot(drug_load_fig)
+else:
+    drug_load_fig = None
+    st.write("No matched species to summarize yet.")
+
 # --- Chart --------------------------------------------------------------
-st.subheader("DAR distribution")
+st.subheader("DAR distribution (species-level)")
 
 has_multi_variant_chemistry = any(len(p.variants) > 1 for p in payload_defs)
 chart_df = matched_with_contrib
@@ -414,25 +480,37 @@ summary_df = pd.DataFrame(
     }
 )
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
     st.download_button(
         "Download DAR report (.xlsx)",
-        data=to_excel_bytes(summary_df, matched_with_contrib),
+        data=to_excel_bytes(summary_df, matched_with_contrib, drug_load_table),
         file_name="dar_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
+        help="Includes the drug-load distribution table as its own sheet.",
     )
 with col2:
     img_buf = io.BytesIO()
     fig.savefig(img_buf, format="png", dpi=150)
     st.download_button(
-        "Download chart (.png)",
+        "Download species-level chart (.png)",
         data=img_buf.getvalue(),
-        file_name="dar_distribution.png",
+        file_name="dar_distribution_species.png",
         mime="image/png",
         use_container_width=True,
     )
+with col3:
+    if drug_load_fig is not None:
+        drug_load_img_buf = io.BytesIO()
+        drug_load_fig.savefig(drug_load_img_buf, format="png", dpi=150)
+        st.download_button(
+            "Download drug-load chart (.png)",
+            data=drug_load_img_buf.getvalue(),
+            file_name="drug_load_distribution.png",
+            mime="image/png",
+            use_container_width=True,
+        )
 
 with st.expander("Base masses used for this run"):
     st.write(pd.DataFrame({"base_mass": base_masses}))
