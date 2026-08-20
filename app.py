@@ -24,6 +24,7 @@ from dar_calculator import (
     base_masses_from_mab,
     build_theoretical_table,
     calculate_dar,
+    consolidate_by_total_count,
     estimate_theoretical_grid_size,
     filter_by_fractional_abundance,
     load_deconvolution_file,
@@ -216,11 +217,83 @@ run_clicked = st.sidebar.button("Run DAR analysis", type="primary", use_containe
 # --------------------------------------------------------------------------
 # Main panel
 # --------------------------------------------------------------------------
+# Results are computed only when "Run DAR analysis" is clicked, then stashed
+# in st.session_state and rendered from there on every subsequent script
+# run. Without this, results would disappear the moment you touched any
+# other widget (like the chart-detail toggle below) - st.button() only
+# reads True on the exact run it was clicked on; every other widget
+# interaction reruns the script with that button reading False again.
 
 st.title(f"\U0001F9EA {APP_TITLE}")
 st.caption(APP_TAGLINE)
 
-if not run_clicked:
+
+def run_analysis():
+    if mab_file is None or adc_file is None:
+        st.error("Please upload both a mAb reference file and an ADC file before running the analysis.")
+        return None
+
+    if not payload_defs:
+        st.error("Please include at least one linker-payload chemistry.")
+        return None
+
+    try:
+        mab_df = read_uploaded_excel(mab_file)
+        adc_df_all = read_uploaded_excel(adc_file)
+    except ValueError as e:
+        st.error(str(e))
+        return None
+
+    try:
+        adc_df = filter_by_fractional_abundance(adc_df_all, adc_min_fractional_abundance)
+    except ValueError as e:
+        st.error(str(e))
+        return None
+
+    if adc_df.empty:
+        st.error(
+            f"No ADC peaks remain at a {adc_min_fractional_abundance:.2f}% fractional abundance threshold "
+            f"(out of {len(adc_df_all)} peaks in the file). Lower the threshold and try again."
+        )
+        return None
+
+    base_masses = base_masses_from_mab(mab_df, top_n=int(base_mass_top_n))
+    estimated_grid_size = estimate_theoretical_grid_size(base_masses, payload_defs)
+    theoretical = build_theoretical_table(base_masses, payload_defs)
+    matched = match_species(adc_df, theoretical, ppm_tolerance=ppm_tolerance)
+    dar, matched_with_contrib = calculate_dar(matched, payload_defs)
+
+    # Column name for every configured mass variant (n_<variant_label>), plus a
+    # "_total" column for chemistries with more than one variant.
+    n_display_cols: list[str] = []
+    for p in payload_defs:
+        for v in p.variants:
+            n_display_cols.append(f"n_{v.variant_label}")
+        if len(p.variants) > 1:
+            n_display_cols.append(f"n_{p.label}_total")
+
+    return {
+        "payload_defs": payload_defs,
+        "payload_labels": [p.label for p in payload_defs],
+        "dar": dar,
+        "matched_with_contrib": matched_with_contrib,
+        "base_masses": base_masses,
+        "n_observed": len(adc_df_all),
+        "n_candidates": len(adc_df),
+        "n_matched": len(matched_with_contrib),
+        "n_display_cols": n_display_cols,
+        "adc_min_fractional_abundance": adc_min_fractional_abundance,
+        "ppm_tolerance": ppm_tolerance,
+        "estimated_grid_size": estimated_grid_size,
+    }
+
+
+if run_clicked:
+    result = run_analysis()
+    if result is not None:
+        st.session_state["dar_compass_results"] = result
+
+if "dar_compass_results" not in st.session_state:
     st.info(
         "Upload a mAb reference file and an ADC file in the sidebar, confirm your linker-payload "
         "chemistries and tolerance, then click **Run DAR analysis**.\n\n"
@@ -229,56 +302,25 @@ if not run_clicked:
     )
     st.stop()
 
-if mab_file is None or adc_file is None:
-    st.error("Please upload both a mAb reference file and an ADC file before running the analysis.")
-    st.stop()
+r = st.session_state["dar_compass_results"]
+payload_defs = r["payload_defs"]
+payload_labels = r["payload_labels"]
+dar = r["dar"]
+matched_with_contrib = r["matched_with_contrib"]
+base_masses = r["base_masses"]
+n_observed = r["n_observed"]
+n_candidates = r["n_candidates"]
+n_matched = r["n_matched"]
+n_display_cols = r["n_display_cols"]
+adc_min_fractional_abundance = r["adc_min_fractional_abundance"]
+ppm_tolerance = r["ppm_tolerance"]
+estimated_grid_size = r["estimated_grid_size"]
 
-if not payload_defs:
-    st.error("Please include at least one linker-payload chemistry.")
-    st.stop()
-
-try:
-    mab_df = read_uploaded_excel(mab_file)
-    adc_df_all = read_uploaded_excel(adc_file)
-except ValueError as e:
-    st.error(str(e))
-    st.stop()
-
-try:
-    adc_df = filter_by_fractional_abundance(adc_df_all, adc_min_fractional_abundance)
-except ValueError as e:
-    st.error(str(e))
-    st.stop()
-
-if adc_df.empty:
-    st.error(
-        f"No ADC peaks remain at a {adc_min_fractional_abundance:.2f}% fractional abundance threshold "
-        f"(out of {len(adc_df_all)} peaks in the file). Lower the threshold and try again."
-    )
-    st.stop()
-
-base_masses = base_masses_from_mab(mab_df, top_n=int(base_mass_top_n))
-
-estimated_grid_size = estimate_theoretical_grid_size(base_masses, payload_defs)
 if estimated_grid_size > 300_000:
     st.warning(
         f"This configuration builds roughly {estimated_grid_size:,} theoretical species, which may run "
         "slowly. Consider reducing the number of mass variants, max conjugation count, or mAb base masses."
     )
-
-theoretical = build_theoretical_table(base_masses, payload_defs)
-matched = match_species(adc_df, theoretical, ppm_tolerance=ppm_tolerance)
-payload_labels = [p.label for p in payload_defs]
-dar, matched_with_contrib = calculate_dar(matched, payload_defs)
-
-# Column name for every configured mass variant (n_<variant_label>), plus a
-# "_total" column for chemistries with more than one variant.
-n_display_cols: list[str] = []
-for p in payload_defs:
-    for v in p.variants:
-        n_display_cols.append(f"n_{v.variant_label}")
-    if len(p.variants) > 1:
-        n_display_cols.append(f"n_{p.label}_total")
 
 with st.expander("Mass variants configured for this run"):
     variant_rows = []
@@ -296,9 +338,6 @@ for col, lbl in zip(cols, payload_labels):
     col.metric(f"DAR [{lbl}]", f"{dar[lbl]:.2f}")
 cols[-1].metric("Total DAR", f"{dar['total']:.2f}")
 
-n_matched = len(matched_with_contrib)
-n_observed = len(adc_df_all)
-n_candidates = len(adc_df)
 n_ambiguous = int(matched_with_contrib["ambiguous"].sum()) if n_matched else 0
 
 filter_note = (
@@ -319,7 +358,26 @@ if n_ambiguous:
 
 # --- Chart --------------------------------------------------------------
 st.subheader("DAR distribution")
-fig = make_distribution_chart(matched_with_contrib, dar, payload_labels)
+
+has_multi_variant_chemistry = any(len(p.variants) > 1 for p in payload_defs)
+chart_df = matched_with_contrib
+if has_multi_variant_chemistry:
+    chart_view = st.radio(
+        "Chart detail",
+        options=["Detailed (show mass variants)", "Consolidated (total counts per chemistry)"],
+        horizontal=True,
+        help=(
+            "Detailed shows every intact/broken mixture as its own bar - precise, but can get "
+            "cluttered once a chemistry has multiple mass variants. Consolidated groups bars by "
+            "total occupied-site count per chemistry only, hiding which specific variant(s) made "
+            "up that total. This toggle only changes this chart - the table below and the DAR "
+            "numbers above are unaffected either way."
+        ),
+    )
+    if chart_view.startswith("Consolidated"):
+        chart_df = consolidate_by_total_count(matched_with_contrib, payload_defs)
+
+fig = make_distribution_chart(chart_df, dar, payload_labels)
 st.pyplot(fig)
 
 # --- Matched species table ----------------------------------------------

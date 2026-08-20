@@ -99,7 +99,15 @@ deploying — that's a compliance question, not a technical one.
    than one plausible species within tolerance) before trusting the reported
    DAR — this is the automated version of the "does this look right?" check
    that used to be a manual judgment call.
-6. Download the DAR report (Excel) and chart (PNG) for your records.
+6. If any chemistry has more than one mass variant configured, a **Chart detail**
+   toggle appears above the distribution chart: **Detailed** shows every intact/
+   broken mixture as its own bar (precise, but can get crowded); **Consolidated**
+   groups bars by total occupied-site count per chemistry only, hiding which
+   specific variant(s) made up that total. This only changes the chart — the
+   table and DAR numbers are identical either way. Results stay on screen while
+   you switch this (or any other widget) back and forth; only clicking
+   **Run DAR analysis** again recomputes them.
+7. Download the DAR report (Excel) and chart (PNG) for your records.
 
 ## Files in this delivery
 

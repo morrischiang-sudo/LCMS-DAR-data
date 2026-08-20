@@ -256,7 +256,15 @@
       <li>
         <h3>Click "Run DAR analysis"</h3>
         <p>Results appear in the main panel: DAR metrics, a distribution chart, a matched-species table, and
-          download buttons.</p>
+          download buttons. Once shown, results stay on screen while you interact with the chart-detail toggle
+          or any other widget — only clicking "Run DAR analysis" again recomputes them.</p>
+      </li>
+      <li>
+        <h3>Toggle chart detail (only shown if a chemistry has multiple mass variants)</h3>
+        <p><strong>Detailed</strong> shows every intact/broken mixture as its own bar — precise, but can get
+          crowded once a chemistry has multiple mass variants. <strong>Consolidated</strong> groups bars by
+          total occupied-site count per chemistry only, hiding which specific variant(s) made up that total.
+          This only changes this chart; the table below and the DAR numbers above are identical either way.</p>
       </li>
       <li>
         <h3>Review anything flagged ambiguous</h3>
@@ -284,7 +292,9 @@
         <h3 style="margin-top:0;">Distribution chart</h3>
         <p>Bars show relative abundance per matched species, sorted highest to lowest.
           <span class="swatch" style="background:#4472C4;"></span>Blue bars are unambiguous matches;
-          <span class="swatch" style="background:#C55A11;"></span>orange bars are ambiguous and worth a closer look.</p>
+          <span class="swatch" style="background:#C55A11;"></span>orange bars are ambiguous and worth a closer look.
+          Use the <strong>Chart detail</strong> toggle (visible when a chemistry has multiple mass variants) to
+          switch between the full mixture breakdown and a consolidated view grouped by total count per chemistry.</p>
       </div>
     </div>
     <h3>Matched species table</h3>

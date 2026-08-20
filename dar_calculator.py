@@ -363,6 +363,51 @@ def calculate_dar(matched_df: pd.DataFrame, payload_defs: Sequence[PayloadDef], 
     return dar, out
 
 
+def consolidate_by_total_count(
+    matched_df: pd.DataFrame,
+    payload_defs: Sequence[PayloadDef],
+    intensity_col: str = "Sum Intensity",
+) -> pd.DataFrame:
+    """Collapse matched species down to one row per unique combination of
+    TOTAL occupied-site count per chemistry, discarding which specific mass
+    variant(s) made up that total.
+
+    This exists purely to make a simplified chart/summary possible once a
+    chemistry has multiple mass variants (e.g. intact + a breakage product):
+    without it, every different intact/broken split at the same total count
+    shows up as its own bar, which gets cluttered fast. This does NOT change
+    any DAR number - it only re-groups the already-matched, already-weighted
+    rows for a cleaner display. Run `calculate_dar` first; pass its output
+    (which already has `relative_abundance` and `ambiguous` columns) in here.
+
+    For chemistries with a single mass variant, the "total count" is just
+    that chemistry's regular n_<label> column, so this is a no-op relabeling
+    in the common case (every group has exactly one row).
+    """
+    if matched_df.empty:
+        return matched_df
+
+    total_cols = []
+    for p in payload_defs:
+        col = f"n_{p.label}_total" if len(p.variants) > 1 else f"n_{p.variants[0].variant_label}"
+        total_cols.append((p.label, col))
+
+    df = matched_df.copy()
+    group_cols = [col for _, col in total_cols]
+    agg_kwargs = {intensity_col: (intensity_col, "sum")}
+    if "relative_abundance" in df.columns:
+        agg_kwargs["relative_abundance"] = ("relative_abundance", "sum")
+    if "ambiguous" in df.columns:
+        agg_kwargs["ambiguous"] = ("ambiguous", "any")
+    grouped = df.groupby(group_cols, as_index=False).agg(**agg_kwargs)
+
+    grouped["species"] = grouped.apply(
+        lambda row: "-".join(f"{int(row[col])}[{label}]" for label, col in total_cols),
+        axis=1,
+    )
+    return grouped.sort_values(intensity_col, ascending=False).reset_index(drop=True)
+
+
 # --------------------------------------------------------------------------
 # High-level convenience wrapper
 # --------------------------------------------------------------------------
