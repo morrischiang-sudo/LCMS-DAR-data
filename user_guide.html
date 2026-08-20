@@ -192,6 +192,9 @@
       <li>The <strong>MW of every linker-payload chemistry</strong> used on this molecule (in Da).</li>
       <li>The <strong>maximum number of conjugation sites</strong> for each chemistry (e.g. up to 8 for interchain-cysteine conjugation).</li>
       <li>Whether conjugation happens <strong>one at a time or only in pairs</strong> (e.g. per disulfide bond) — this sets the count step (1 or 2).</li>
+      <li>Whether you've observed <strong>unexpected linker-payload breakage</strong> under harsh sample
+        processing — if so, the additional mass(es) that breakage produces, and whether each still represents a
+        "loaded" site for DAR purposes (see Step 3 below).</li>
     </ul>
   </section>
 
@@ -212,8 +215,15 @@
       <li>
         <h3>Configure each chemistry</h3>
         <p>For each payload chemistry: tick <strong>Include in analysis</strong>, give it a short label (e.g.
-          <code>4</code>, <code>12</code>, or a payload name), enter its <strong>MW in Da</strong>, its
-          <strong>maximum conjugation count</strong>, and whether counts step by 1 or 2.</p>
+          <code>4</code>, <code>12</code>, or a payload name), and set its <strong>maximum conjugation count</strong>
+          and whether counts step by 1 or 2.</p>
+        <p>Each chemistry needs at least one <strong>mass variant</strong> — its MW in Da. If it's a normal intact
+          linker-payload, one variant is all you need. If you've seen breakage under harsh processing, increase
+          "Number of mass variants" and enter the additional mass(es); DAR Compass treats breakage as independent
+          per attachment site, so a single molecule can have some sites intact and others broken simultaneously.
+          Each variant also has a <strong>DAR weight</strong> (1.0 by default): leave it at 1.0 if a broken site
+          should still count as a full payload, or lower it (down to 0.0) if that broken form means the payload
+          is partially or fully lost. This is a chemistry-specific judgment call — DAR Compass won't guess it for you.</p>
       </li>
       <li>
         <h3>Set the ADC fractional abundance threshold (optional)</h3>
@@ -228,6 +238,14 @@
         <p>The ppm tolerance controls how far an observed mass can be from a theoretical mass and still count as
           a match. 250–350 ppm reproduced manually-curated results for ~150–165 kDa intact ADC species during
           validation — start there and adjust based on your own instrument/method performance.</p>
+        <div class="callout warn">
+          <strong>Using more than one mass variant needs a tighter tolerance.</strong> A second mass variant
+          doesn't just add one more theoretical mass — it adds every possible split of that chemistry's site
+          count between the variants, so the theoretical ladder gets much denser. In testing, one breakage
+          variant with a 350 ppm tolerance flagged most matches as ambiguous. Start narrower once you're using
+          multiple variants, and use the grid-size warning and the "Mass variants configured" panel (see below)
+          to sanity-check your setup.
+        </div>
       </li>
       <li>
         <h3>Choose how many mAb base masses to use</h3>
@@ -271,13 +289,18 @@
     </div>
     <h3>Matched species table</h3>
     <p>Every accepted peak, its assigned species, mass accuracy (ppm), relative abundance, and payload counts.
-      Rows shaded light orange are ambiguous — the <code>runner_up_species</code> and
-      <code>runner_up_ppm_error</code> columns show the next-closest alternative so you can judge which is more
-      plausible.</p>
+      For a chemistry with more than one mass variant, you'll see a count column per variant (e.g. one for the
+      intact form, one for each breakage variant) plus a combined total column. Rows shaded light orange are
+      ambiguous — the <code>runner_up_species</code> and <code>runner_up_ppm_error</code> columns show the
+      next-closest alternative so you can judge which is more plausible.</p>
+    <p>The <strong>"Mass variants configured for this run"</strong> panel above the chart lists every chemistry's
+      variants with their MW and DAR weight, so you can double-check your setup before trusting the results.</p>
     <div class="callout warn">
       <strong>An ambiguous flag doesn't mean the match is wrong</strong> — it means two labels were both
       mathematically plausible within your tolerance. Narrower tolerance, or excluding minor mAb mass variants
-      from the base-mass set, usually resolves most of these.
+      from the base-mass set, usually resolves most of these. If you're using multiple mass variants on a
+      chemistry, expect more ambiguous flags than usual (see the tolerance note in Step 5 of the walkthrough) —
+      it's a sign to tighten tolerance or simplify the configuration, not necessarily a data problem.
     </div>
   </section>
 

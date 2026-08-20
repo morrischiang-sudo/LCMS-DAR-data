@@ -65,9 +65,17 @@ deploying — that's a compliance question, not a technical one.
    deconvolution export (`.xlsx`) in the sidebar. Both need at least
    `Average Mass` and `Sum Intensity` columns (standard BioPharma-Finder-style
    export format).
-2. Set up each linker-payload chemistry you expect: a short label, its MW in Da,
-   the maximum conjugation count, and whether counts step by 1 or 2 (use 2 if
-   conjugation only happens in pairs, e.g. per interchain disulfide).
+2. Set up each linker-payload chemistry you expect: a short label, the maximum
+   conjugation count, and whether counts step by 1 or 2 (use 2 if conjugation only
+   happens in pairs, e.g. per interchain disulfide). For each chemistry, enter one
+   **mass variant** (its MW in Da) if it's a normal intact linker-payload. If you've
+   seen unexpected linker-payload breakage under harsh sample processing, increase
+   "Number of mass variants" and add the additional possible mass(es) — DAR Compass
+   models breakage as happening independently per attachment site, so a single
+   molecule can have some sites intact and others broken at once. Each variant has
+   its own **DAR weight** (1.0 = counts as a full payload like today; lower or 0.0
+   if that broken form represents partial or total payload loss — this is a
+   chemistry-specific call only you can make).
 3. Optionally set the **ADC fractional abundance threshold (%)**. Only ADC peaks
    at or above this value are treated as candidate species before matching —
    useful for ignoring very low-abundance/noise peaks up front. Leave at 0 to
@@ -75,6 +83,18 @@ deploying — that's a compliance question, not a technical one.
 4. Set the ppm mass-accuracy tolerance. 250-350 ppm reproduced the manually
    curated species assignments in both validation datasets; tune this per
    instrument/method rather than trusting a single fixed number.
+
+   **Using more than one mass variant on a chemistry pushes this a lot harder than
+   it looks.** Adding a second mass variant doesn't just add one more theoretical
+   mass — it adds every possible split of that chemistry's site count between the
+   two variants, so the theoretical mass ladder gets much denser. In testing, adding
+   one breakage variant with a wide 350 ppm tolerance flagged the large majority of
+   matches as ambiguous — not a bug, but a sign the tolerance and/or max conjugation
+   count need tightening once multiple variants are in play. Start narrower than you
+   would for a single-variant chemistry and widen only as far as you can while
+   keeping ambiguous flags manageable. The "Mass variants configured for this run"
+   panel and the grid-size warning (shown if a configuration would build an unusually
+   large number of theoretical species) are there to help you judge this.
 5. Click **Run DAR analysis**. Review any peaks flagged **ambiguous** (more
    than one plausible species within tolerance) before trusting the reported
    DAR — this is the automated version of the "does this look right?" check

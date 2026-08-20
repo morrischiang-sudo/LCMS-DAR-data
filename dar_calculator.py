@@ -11,27 +11,41 @@ characterization.pptx":
   1. Take the naked mAb (reference) deconvolution export and use its
      observed intact masses as "base masses" (these capture glycoform /
      adduct heterogeneity of the unconjugated antibody).
-  2. For each linker-payload chemistry the user specifies (name, monoisotopic/
-     average MW, allowed conjugation-number range), build the full
-     combinatorial grid of theoretical intact masses:
-         theoretical_mass = base_mass + sum(n_i * MW_i)
+  2. For each linker-payload chemistry the user specifies (name, one or
+     more possible masses per conjugation event, and an allowed
+     conjugation-number range), build the full combinatorial grid of
+     theoretical intact masses. Each chemistry may have multiple "mass
+     variants" (e.g. an intact linker-payload mass and one or more
+     lower-mass forms from breakage during harsh sample processing);
+     variants are mixed independently per attachment site within one
+     molecule, since breakage is expected to act per-site rather than
+     uniformly across a whole molecule:
+         theoretical_mass = base_mass + sum over chemistries of
+                             sum over that chemistry's variants of
+                             (n_variant * MW_variant)
   3. Match each observed ADC deconvolution peak to its nearest theoretical
      mass. Keep the match only if the mass accuracy is within a ppm
      tolerance (the PPTX states <20 ppm = accurate, ~300 ppm = inaccurate;
      exposed here as a user-adjustable parameter).
   4. Compute intensity-weighted relative abundance across all matched
-     species, then per-payload DAR = sum(relative_abundance * n_payload),
-     and Total DAR = sum across payload types.
+     species, then per-payload DAR = sum(relative_abundance * n_variant *
+     dar_weight_variant), and Total DAR = sum across payload chemistries.
+     `dar_weight` lets a "broken" mass variant count toward DAR the same
+     as an intact one (default), partially, or not at all (0.0) - this is
+     a chemistry-specific judgment call, not something this module decides
+     on its own.
 
 This module is meant to be the computational core behind an upload-and-click
 web UI: user uploads mAb + ADC deconvolution files, ticks which linker-payload
-chemistries apply and enters their MW/valence, and gets back a DAR report.
+chemistries apply and enters their mass variant(s)/valence, and gets back a
+DAR report.
 """
 
 from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass, field
+from math import comb
 from pathlib import Path
 from typing import Sequence
 
@@ -111,24 +125,138 @@ def filter_by_fractional_abundance(
 # --------------------------------------------------------------------------
 
 @dataclass
+class MassVariant:
+    """One possible per-site mass for a linker-payload chemistry.
+
+    Most chemistries need only one variant (the intact linker-payload mass).
+    Add more when breakage during harsh sample processing produces
+    additional possible masses at a conjugation site (e.g. a lower-mass
+    degraded form).
+    """
+    mw: float                      # Da, added mass per conjugation event for this variant
+    dar_weight: float = 1.0        # how much one site of this variant counts toward DAR
+                                    # (1.0 = counts as a full payload, same as today;
+                                    #  0.0 = doesn't count, e.g. total payload loss)
+    variant_label: str = ""        # filled in automatically by PayloadDef if left blank
+
+
+@dataclass
 class PayloadDef:
-    """One linker-payload chemistry the user specifies for the platform."""
-    label: str            # e.g. "4", "12", "DXd", "MMAE"
-    mw: float              # Da, added mass per conjugation event
-    n_values: Sequence[int] = field(default_factory=lambda: range(0, 9))  # allowed counts
+    """One linker-payload chemistry the user specifies for the platform.
+
+    Backward compatible: existing calls like
+        PayloadDef(label="4", mw=2108.35, n_values=range(0, 6))
+    keep working unchanged (a single implicit MassVariant with dar_weight=1.0).
+    To add breakage-derived mass variants, pass `variants` instead:
+        PayloadDef(label="MMAE", n_values=range(0, 5), variants=[
+            MassVariant(mw=2460.88),                  # intact
+            MassVariant(mw=1718.85, dar_weight=0.0),  # payload fully lost
+        ])
+    """
+    label: str                                    # e.g. "4", "12", "DXd", "MMAE"
+    mw: float | None = None                       # Da; ignored if `variants` is given
+    n_values: Sequence[int] = field(default_factory=lambda: range(0, 9))  # allowed TOTAL counts
+    variants: Sequence[MassVariant] | None = None  # one or more possible per-site masses
+
+    def __post_init__(self):
+        if self.variants:
+            variants = list(self.variants)
+        elif self.mw is not None:
+            variants = [MassVariant(mw=float(self.mw), dar_weight=1.0)]
+        else:
+            raise ValueError(f"PayloadDef '{self.label}': provide either `mw` or `variants`.")
+
+        if len(variants) == 1:
+            if not variants[0].variant_label:
+                variants[0].variant_label = self.label
+        else:
+            for i, v in enumerate(variants):
+                if not v.variant_label:
+                    v.variant_label = self.label if i == 0 else f"{self.label}_b{i}"
+
+        self.variants = variants
+
+
+def _partitions(n: int, k: int):
+    """Yield every k-tuple of non-negative ints summing to n.
+
+    This is how one chemistry's total occupied-site count (n) is split
+    across its mass variants, since breakage is modeled as acting
+    independently per attachment site (a single molecule can have some
+    sites intact and others broken at the same time).
+    """
+    if k == 1:
+        yield (n,)
+        return
+    for i in range(n + 1):
+        for rest in _partitions(n - i, k - 1):
+            yield (i,) + rest
+
+
+def _chemistry_label(combo: tuple[int, ...], variants: Sequence[MassVariant]) -> str:
+    if len(variants) == 1:
+        return f"{combo[0]}[{variants[0].variant_label}]"
+    nonzero = [(c, v) for c, v in zip(combo, variants) if c > 0]
+    if not nonzero:
+        return f"0[{variants[0].variant_label}]"
+    return "+".join(f"{c}[{v.variant_label}]" for c, v in nonzero)
+
+
+def estimate_theoretical_grid_size(base_masses: Sequence[float], payload_defs: Sequence[PayloadDef]) -> int:
+    """Roughly how many theoretical species build_theoretical_table will produce.
+
+    Useful as a cheap sanity check before running a large multi-variant
+    grid - the count grows quickly with more mass variants per chemistry.
+    """
+    total = max(len(base_masses), 1)
+    for p in payload_defs:
+        k = len(p.variants)
+        chem_count = 0
+        for n in p.n_values:
+            chem_count += comb(n + k - 1, k - 1) if k > 1 else 1
+        total *= max(chem_count, 1)
+    return total
 
 
 def build_theoretical_table(base_masses: Sequence[float], payload_defs: Sequence[PayloadDef]) -> pd.DataFrame:
-    """Build every combination of (base mass) x (n per payload type)."""
+    """Build every combination of (base mass) x (per-chemistry variant mixture).
+
+    For a chemistry with a single mass variant, this reduces exactly to the
+    original behavior: one count `n` per chemistry, label "n[label]".
+
+    For a chemistry with multiple mass variants, every total count `n` in
+    `n_values` is split every possible way across that chemistry's variants
+    (e.g. n=3 with 2 variants -> (3,0), (2,1), (1,2), (0,3)), modeling
+    breakage as an independent per-site event within one molecule.
+    """
+    per_chem_options = []
+    for p in payload_defs:
+        variants = p.variants
+        options = []
+        for n in p.n_values:
+            for combo in _partitions(n, len(variants)):
+                mass_contrib = sum(c * v.mw for c, v in zip(combo, variants))
+                label_piece = _chemistry_label(combo, variants)
+                n_by_variant = {v.variant_label: c for c, v in zip(combo, variants)}
+                options.append({
+                    "total_n": n,
+                    "mass_contrib": mass_contrib,
+                    "label_piece": label_piece,
+                    "n_by_variant": n_by_variant,
+                })
+        per_chem_options.append(options)
+
     rows = []
-    n_value_lists = [list(p.n_values) for p in payload_defs]
     for base in base_masses:
-        for combo in itertools.product(*n_value_lists):
-            mass = base + sum(n * p.mw for n, p in zip(combo, payload_defs))
-            label = "-".join(f"{n}[{p.label}]" for n, p in zip(combo, payload_defs))
+        for combo_opts in itertools.product(*per_chem_options):
+            mass = base + sum(o["mass_contrib"] for o in combo_opts)
+            label = "-".join(o["label_piece"] for o in combo_opts)
             row = {"base_mass": base, "theoretical_mass": mass, "label": label}
-            for n, p in zip(combo, payload_defs):
-                row[f"n_{p.label}"] = n
+            for p, o in zip(payload_defs, combo_opts):
+                for var_label, c in o["n_by_variant"].items():
+                    row[f"n_{var_label}"] = c
+                if len(p.variants) > 1:
+                    row[f"n_{p.label}_total"] = o["total_n"]
             rows.append(row)
     return pd.DataFrame(rows)
 
@@ -202,25 +330,35 @@ def match_species(
 # DAR calculation
 # --------------------------------------------------------------------------
 
-def calculate_dar(matched_df: pd.DataFrame, payload_labels: Sequence[str], intensity_col: str = "Sum Intensity") -> tuple[dict, pd.DataFrame]:
-    """Intensity-weighted DAR per payload type + total, following the
-    formulas in the PPTX:
+def calculate_dar(matched_df: pd.DataFrame, payload_defs: Sequence[PayloadDef], intensity_col: str = "Sum Intensity") -> tuple[dict, pd.DataFrame]:
+    """Intensity-weighted DAR per payload chemistry + total, following the
+    formulas in the PPTX, generalized for multiple mass variants per
+    chemistry:
         relative_abundance(species) = intensity(species) / sum(intensity, matched species)
-        DAR(payload)  = sum(relative_abundance * n_payload)
-        Total DAR     = sum(DAR(payload) for all payload types)
+        DAR(chemistry) = sum over matched species of
+                          relative_abundance(species) *
+                          sum over that chemistry's variants of (n_variant(species) * dar_weight_variant)
+        Total DAR      = sum(DAR(chemistry) for all chemistries)
+
+    A chemistry with a single mass variant (dar_weight=1.0, the default)
+    reduces exactly to the original formula: DAR = sum(relative_abundance * n_payload).
     """
     if matched_df.empty:
-        return {**{lbl: 0.0 for lbl in payload_labels}, "total": 0.0}, matched_df
+        return {**{p.label: 0.0 for p in payload_defs}, "total": 0.0}, matched_df
 
     out = matched_df.copy()
     total_intensity = out[intensity_col].sum()
     out["relative_abundance"] = out[intensity_col] / total_intensity
 
     dar = {}
-    for lbl in payload_labels:
-        col = f"n_{lbl}"
-        out[f"dar_contrib_{lbl}"] = out["relative_abundance"] * out[col]
-        dar[lbl] = out[f"dar_contrib_{lbl}"].sum()
+    for p in payload_defs:
+        contrib = pd.Series(0.0, index=out.index)
+        for v in p.variants:
+            col = f"n_{v.variant_label}"
+            if col in out.columns:
+                contrib = contrib + out[col] * v.dar_weight
+        out[f"dar_contrib_{p.label}"] = out["relative_abundance"] * contrib
+        dar[p.label] = out[f"dar_contrib_{p.label}"].sum()
     dar["total"] = float(sum(dar.values()))
     return dar, out
 
@@ -244,7 +382,7 @@ def run_dar_analysis(
     base_masses = base_masses_from_mab(mab_df, top_n=base_mass_top_n)
     theoretical = build_theoretical_table(base_masses, payload_defs)
     matched = match_species(adc_df, theoretical, ppm_tolerance=ppm_tolerance)
-    dar, matched_with_contrib = calculate_dar(matched, [p.label for p in payload_defs])
+    dar, matched_with_contrib = calculate_dar(matched, payload_defs)
 
     return {
         "base_masses": base_masses,

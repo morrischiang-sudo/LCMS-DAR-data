@@ -19,10 +19,12 @@ import pandas as pd
 import streamlit as st
 
 from dar_calculator import (
+    MassVariant,
     PayloadDef,
     base_masses_from_mab,
     build_theoretical_table,
     calculate_dar,
+    estimate_theoretical_grid_size,
     filter_by_fractional_abundance,
     load_deconvolution_file,
     match_species,
@@ -143,11 +145,44 @@ for i in range(int(n_payloads)):
     with st.sidebar.expander(f"Chemistry {i + 1}", expanded=(i < 2)):
         include = st.checkbox("Include in analysis", value=True, key=f"include_{i}")
         label = st.text_input("Label", value=str(i + 1), key=f"label_{i}", help="Short tag, e.g. '4', '12', 'DXd'.")
-        mw = st.number_input("Linker-payload MW (Da)", min_value=0.0, value=1717.83, step=0.01, format="%.2f", key=f"mw_{i}")
+
+        n_variants = st.number_input(
+            "Number of mass variants for this chemistry",
+            min_value=1, max_value=4, value=1, step=1, key=f"nvariants_{i}",
+            help=(
+                "Usually 1 (the intact linker-payload mass). Add more if breakage during harsh sample "
+                "processing produces additional possible masses at a conjugation site — DAR Compass will "
+                "consider any mix of these variants across a chemistry's attachment sites within one molecule."
+            ),
+        )
+
+        variants: list[MassVariant] = []
+        for v in range(int(n_variants)):
+            variant_tag = "intact" if v == 0 else f"variant {v + 1}"
+            st.markdown(f"**Mass variant {v + 1}** ({variant_tag})" if v == 0 else f"**Mass variant {v + 1}**")
+            vmw = st.number_input(
+                "MW (Da)", min_value=0.0, value=1717.83 if v == 0 else 0.0, step=0.01, format="%.2f",
+                key=f"mw_{i}_{v}",
+            )
+            vweight = st.number_input(
+                "DAR weight", min_value=0.0, max_value=1.0, value=1.0, step=0.05, format="%.2f",
+                key=f"weight_{i}_{v}",
+                help=(
+                    "How much one occupied site of this mass variant counts toward DAR. 1.0 (default) = "
+                    "counts as a full payload, same as an intact site. Set lower (or 0) for a variant "
+                    "that represents partial or complete payload loss."
+                ),
+            )
+            variants.append(MassVariant(mw=float(vmw), dar_weight=float(vweight)))
+
         max_n = st.number_input("Max conjugation count", min_value=0, max_value=20, value=8, step=1, key=f"maxn_{i}")
         step = st.selectbox("Allowed count step", options=[1, 2], index=0, key=f"step_{i}", help="Use 2 if conjugation only occurs in pairs (e.g. per disulfide bond).")
         if include:
-            payload_defs.append(PayloadDef(label=label.strip() or str(i + 1), mw=float(mw), n_values=list(range(0, int(max_n) + 1, int(step)))))
+            payload_defs.append(PayloadDef(
+                label=label.strip() or str(i + 1),
+                variants=variants,
+                n_values=list(range(0, int(max_n) + 1, int(step))),
+            ))
 
 st.sidebar.header("3. ADC candidate selection")
 adc_min_fractional_abundance = st.sidebar.number_input(
@@ -223,10 +258,37 @@ if adc_df.empty:
     st.stop()
 
 base_masses = base_masses_from_mab(mab_df, top_n=int(base_mass_top_n))
+
+estimated_grid_size = estimate_theoretical_grid_size(base_masses, payload_defs)
+if estimated_grid_size > 300_000:
+    st.warning(
+        f"This configuration builds roughly {estimated_grid_size:,} theoretical species, which may run "
+        "slowly. Consider reducing the number of mass variants, max conjugation count, or mAb base masses."
+    )
+
 theoretical = build_theoretical_table(base_masses, payload_defs)
 matched = match_species(adc_df, theoretical, ppm_tolerance=ppm_tolerance)
 payload_labels = [p.label for p in payload_defs]
-dar, matched_with_contrib = calculate_dar(matched, payload_labels)
+dar, matched_with_contrib = calculate_dar(matched, payload_defs)
+
+# Column name for every configured mass variant (n_<variant_label>), plus a
+# "_total" column for chemistries with more than one variant.
+n_display_cols: list[str] = []
+for p in payload_defs:
+    for v in p.variants:
+        n_display_cols.append(f"n_{v.variant_label}")
+    if len(p.variants) > 1:
+        n_display_cols.append(f"n_{p.label}_total")
+
+with st.expander("Mass variants configured for this run"):
+    variant_rows = []
+    for p in payload_defs:
+        for v in p.variants:
+            variant_rows.append({
+                "Chemistry": p.label, "Variant": v.variant_label,
+                "MW (Da)": v.mw, "DAR weight": v.dar_weight,
+            })
+    st.dataframe(pd.DataFrame(variant_rows), use_container_width=True, hide_index=True)
 
 # --- Top-line metrics -------------------------------------------------
 cols = st.columns(len(payload_labels) + 1)
@@ -264,7 +326,7 @@ st.pyplot(fig)
 st.subheader("Matched species")
 if n_matched:
     display_cols = ["Average Mass", "Sum Intensity", "species", "ppm_error", "relative_abundance"]
-    display_cols += [f"n_{lbl}" for lbl in payload_labels]
+    display_cols += n_display_cols
     display_cols += ["ambiguous", "runner_up_species", "runner_up_ppm_error"]
     display_df = matched_with_contrib[display_cols].copy()
     display_df["relative_abundance"] = (display_df["relative_abundance"] * 100).round(2)
