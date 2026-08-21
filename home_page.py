@@ -10,9 +10,15 @@ via st.session_state before calling st.navigation.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import streamlit as st
 
 from dar_ui_helpers import APP_TAGLINE, APP_TITLE
+
+_ASSET_DIR = Path(__file__).parent
+SEC_CARTOON = _ASSET_DIR / "SEC LC-MS section cartoon.png"
+IDEZ_CARTOON = _ASSET_DIR / "IdelZ section cartoon.png"
 
 
 def render() -> None:
@@ -40,6 +46,12 @@ def render() -> None:
             )
             if sec_page_obj is not None:
                 st.page_link(sec_page_obj, label="Open SEC LC-MS Analysis →", icon="\U0001F9EA", use_container_width=True)
+        if SEC_CARTOON.exists():
+            st.image(
+                str(SEC_CARTOON),
+                caption="SEC separates intact ADC species by drug load — higher-DAR species elute earlier.",
+                use_container_width=True,
+            )
 
     with col2:
         with st.container(border=True):
@@ -55,6 +67,12 @@ def render() -> None:
             )
             if rp_page_obj is not None:
                 st.page_link(rp_page_obj, label="Open RP LC-MS (IdeZ digestion) →", icon="\U0001F52C", use_container_width=True)
+        if IDEZ_CARTOON.exists():
+            st.image(
+                str(IDEZ_CARTOON),
+                caption="IdeZ digestion splits the antibody/ADC into F(ab')2 (~100 kDa) and Fc (~50 kDa) fragments, analyzed independently.",
+                use_container_width=True,
+            )
 
     st.divider()
     st.caption(
