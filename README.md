@@ -99,7 +99,16 @@ deploying — that's a compliance question, not a technical one.
    than one plausible species within tolerance) before trusting the reported
    DAR — this is the automated version of the "does this look right?" check
    that used to be a manual judgment call.
-6. Open **"Peak-by-peak verification"** if a result looks off, or just to
+6. Check the **Selection summary** table right below the DAR metrics: how
+   many ADC peaks were excluded by the abundance threshold, how many
+   candidates were matched vs. unmatched, as both a peak count and a %
+   of total signal (Fractional Abundance). The two percentages can diverge
+   a lot on purpose — matching a small fraction of peaks by count can still
+   mean capturing nearly all of the real signal, since low-abundance noise
+   peaks are expected to go unmatched. Treat a low peak-count % as fine if
+   the signal % is high; treat a low signal % as a sign to dig into the
+   verification table below.
+7. Open **"Peak-by-peak verification"** if a result looks off, or just to
    sanity-check a run. It lists every peak in the ADC file — matched or not —
    with its closest theoretical species and ppm error, color-coded: green =
    matched, yellow = excluded by the fractional abundance threshold before
@@ -109,7 +118,7 @@ deploying — that's a compliance question, not a technical one.
    mass variant's MW) needs adjusting — the grid simply doesn't reach that
    peak yet, rather than the peak being noise. This is what caught the
    ACE723 max-conjugation-count issue.
-7. Check the **Drug-load distribution** table and chart: one row/panel per
+8. Check the **Drug-load distribution** table and chart: one row/panel per
    chemistry, one column per count (0, 1, 2, ...), showing the % of matched
    intensity at each count independent of the other chemistries, plus an
    Average column (the same DAR number as the metric above). This is the
@@ -118,7 +127,7 @@ deploying — that's a compliance question, not a technical one.
    the modal count highlighted. If a chemistry has a mass variant with a
    DAR weight other than 1.0, a note explains why the row's simple mean
    won't exactly equal the Average column.
-8. If any chemistry has more than one mass variant configured, a **Chart detail**
+9. If any chemistry has more than one mass variant configured, a **Chart detail**
    toggle also appears above the species-level distribution chart further down:
    **Detailed** shows every intact/broken mixture as its own bar (precise, but
    can get crowded); **Consolidated** groups bars by total occupied-site count
@@ -127,11 +136,12 @@ deploying — that's a compliance question, not a technical one.
    either way. Results stay on screen while you switch this (or any other
    widget) back and forth; only clicking **Run DAR analysis** again recomputes
    them.
-9. Download the DAR report (Excel) and both charts (PNG) for your records.
-   The Excel file now includes an **Analysis** sheet — every parameter used,
-   the full theoretical mass grid (every permutation the matching considered),
-   and the same peak-by-peak verification table from step 6 — so someone
-   else can check the result by hand without re-running anything.
+10. Download the DAR report (Excel) and both charts (PNG) for your records.
+    The Excel file now includes a **Selection Summary** sheet (the same
+    funnel table from step 6) and an **Analysis** sheet — every parameter
+    used, the full theoretical mass grid (every permutation the matching
+    considered), and the peak-by-peak verification table from step 7 — so
+    someone else can check the result by hand without re-running anything.
 
 ## Files in this delivery
 

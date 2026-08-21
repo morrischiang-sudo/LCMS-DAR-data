@@ -23,6 +23,7 @@ from dar_calculator import (
     PayloadDef,
     base_masses_from_mab,
     build_drug_load_summary_table,
+    build_selection_summary,
     build_theoretical_table,
     build_verification_table,
     calculate_dar,
@@ -200,10 +201,13 @@ def to_excel_bytes(
     params_df: pd.DataFrame | None = None,
     theoretical_df: pd.DataFrame | None = None,
     verification_df: pd.DataFrame | None = None,
+    selection_summary_df: pd.DataFrame | None = None,
 ) -> bytes:
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         summary_df.to_excel(writer, sheet_name="DAR Summary", index=False)
+        if selection_summary_df is not None and not selection_summary_df.empty:
+            selection_summary_df.to_excel(writer, sheet_name="Selection Summary", index=False)
         if drug_load_df is not None and not drug_load_df.empty:
             drug_load_df.to_excel(writer, sheet_name="Drug-load Distribution")
         species_df.to_excel(writer, sheet_name="Matched Species", index=False)
@@ -485,15 +489,17 @@ cols[-1].metric("Total DAR", f"{dar['total']:.2f}")
 
 n_ambiguous = int(matched_with_contrib["ambiguous"].sum()) if n_matched else 0
 
-filter_note = (
-    f" ({n_observed} peaks in file → {n_candidates} at or above {adc_min_fractional_abundance:.2f}% fractional abundance)"
-    if adc_min_fractional_abundance > 0
-    else f" ({n_observed} peaks in file, no fractional abundance filter applied)"
-)
+# --- Selection summary ----------------------------------------------------
+st.subheader("Selection summary")
 st.caption(
-    f"Matched {n_matched} of {n_candidates} candidate ADC peaks to an intact theoretical species "
-    f"within {ppm_tolerance} ppm{filter_note}. {n_ambiguous} matched peak(s) flagged as ambiguous."
+    "How many ADC peaks were selected at each stage, and how much of the total signal they "
+    "represent. The two percentages can diverge a lot - matching a small fraction of peaks by "
+    "count can still mean capturing nearly all of the real signal, since low-abundance noise "
+    "peaks are expected to go unmatched. See \"Peak-by-peak verification\" above for the detail "
+    "behind these numbers."
 )
+selection_summary = build_selection_summary(verification_df)
+st.dataframe(selection_summary, use_container_width=True, hide_index=True)
 
 if n_ambiguous:
     st.warning(
@@ -596,6 +602,7 @@ with col1:
         data=to_excel_bytes(
             summary_df, matched_with_contrib, drug_load_table,
             params_df=params_df, theoretical_df=theoretical, verification_df=verification_df,
+            selection_summary_df=selection_summary,
         ),
         file_name="dar_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

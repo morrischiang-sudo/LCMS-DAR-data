@@ -374,6 +374,58 @@ def build_verification_table(
     return pd.DataFrame(rows).sort_values(mass_col).reset_index(drop=True)
 
 
+def build_selection_summary(verification_df: pd.DataFrame, abundance_col: str | None = None) -> pd.DataFrame:
+    """Quick funnel overview: how many ADC peaks - and how much of the total
+    signal - survive each stage (fractional abundance threshold, then ppm
+    matching).
+
+    Peak *count* and *intensity* percentages are shown side by side because
+    they can tell very different stories: matching only a small fraction of
+    peaks by count can still mean capturing nearly all of the real signal,
+    since low-abundance noise peaks are expected to go unmatched. Built
+    directly from `build_verification_table`'s output, so it always agrees
+    with what that table shows.
+    """
+    if verification_df.empty:
+        return pd.DataFrame()
+
+    if abundance_col is None:
+        abundance_col = "Fractional Abundance" if "Fractional Abundance" in verification_df.columns else "Relative Abundance"
+
+    n_total = len(verification_df)
+    passed = verification_df["passed_abundance_threshold"]
+    matched = verification_df["matched"]
+    unmatched_candidates = passed & ~matched
+
+    total_abundance = verification_df[abundance_col].sum() if abundance_col in verification_df.columns else None
+
+    def pct_of_abundance(mask):
+        if total_abundance in (None, 0):
+            return None
+        return float(verification_df.loc[mask, abundance_col].sum() / total_abundance * 100)
+
+    stages = [
+        ("Total peaks in ADC file", pd.Series([True] * n_total, index=verification_df.index)),
+        ("Excluded by fractional abundance threshold", ~passed),
+        ("Candidate peaks (passed threshold)", passed),
+        ("Matched to a theoretical species", matched),
+        ("Unmatched (passed threshold, no species within tolerance)", unmatched_candidates),
+    ]
+
+    rows = []
+    for name, mask in stages:
+        count = int(mask.sum())
+        rows.append({
+            "Stage": name,
+            "Peak count": count,
+            "% of peaks": round(count / n_total * 100, 1) if n_total else None,
+            "% of total signal (Fractional Abundance)": (
+                round(pct_of_abundance(mask), 1) if pct_of_abundance(mask) is not None else None
+            ),
+        })
+    return pd.DataFrame(rows)
+
+
 # --------------------------------------------------------------------------
 # DAR calculation
 # --------------------------------------------------------------------------

@@ -280,6 +280,15 @@
           highlighted in the table and counted in a warning banner. Check these before reporting the DAR value.</p>
       </li>
       <li>
+        <h3>Check the Selection summary table</h3>
+        <p>A quick funnel: total ADC peaks → excluded by the abundance threshold → candidates → matched →
+          unmatched, shown as both a peak count and a % of total signal (Fractional Abundance). These two
+          percentages are meant to diverge sometimes — matching a small fraction of peaks by count can still
+          mean capturing nearly all of the real signal, since low-abundance noise peaks are expected to go
+          unmatched. A low peak-count % alongside a high signal % is normal and fine; a low signal % is the
+          one worth investigating in the verification table below.</p>
+      </li>
+      <li>
         <h3>Open "Peak-by-peak verification" if anything looks off</h3>
         <p>Lists <em>every</em> peak in the ADC file, matched or not, with its closest theoretical species and
           ppm error. Rows are color-coded: <span class="swatch" style="background:#D9EAD3;"></span>green = matched,
@@ -293,11 +302,11 @@
       </li>
       <li>
         <h3>Download your report</h3>
-        <p>Use the download buttons to save the DAR report as an Excel file — summary, drug-load distribution,
-          full matched-species table, and now an <strong>Analysis</strong> sheet with every parameter used, the
-          full theoretical mass grid, and the same peak-by-peak verification table, each on its own sheet — plus
-          both charts as PNGs, for your records, an ELN/LIMS entry, or so someone else can check the result by
-          hand without re-running anything.</p>
+        <p>Use the download buttons to save the DAR report as an Excel file — summary, <strong>Selection
+          Summary</strong>, drug-load distribution, full matched-species table, and an <strong>Analysis</strong>
+          sheet with every parameter used, the full theoretical mass grid, and the peak-by-peak verification
+          table, each on its own sheet — plus both charts as PNGs, for your records, an ELN/LIMS entry, or so
+          someone else can check the result by hand without re-running anything.</p>
       </li>
     </ol>
   </section>
