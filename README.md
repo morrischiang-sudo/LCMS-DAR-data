@@ -6,8 +6,10 @@ and validation this app is built on.
 
 ## Two independent pages
 
-The app has two pages, switchable from the sidebar navigation, each with its own
-file uploads and settings:
+The app opens on a **Home** page with two cards explaining each workflow and a
+button straight into each — useful for first-time users deciding which one
+applies. From there (or any time, via the sidebar navigation), there are two
+analysis pages, each with its own file uploads and settings:
 
 - **SEC LC-MS Analysis** — the original workflow: one naked-mAb reference file and
   one ADC file, analyzed as intact molecules.
