@@ -14,7 +14,15 @@ from pathlib import Path
 
 import streamlit as st
 
-from dar_ui_helpers import APP_TAGLINE, APP_TITLE
+from dar_ui_helpers import APP_TAGLINE, APP_TITLE, run_fragment_analysis
+from example_data import (
+    EXAMPLE_ABUNDANCE_THRESHOLD,
+    EXAMPLE_BASE_MASS_MODE,
+    EXAMPLE_BASE_MASS_TOP_N,
+    EXAMPLE_PAYLOAD_DEFS,
+    EXAMPLE_PPM_TOLERANCE,
+    build_example_files,
+)
 
 _ASSET_DIR = Path(__file__).parent
 SEC_CARTOON = _ASSET_DIR / "SEC LC-MS section cartoon.png"
@@ -80,3 +88,21 @@ def render() -> None:
         "per sample, use SEC LC-MS. If your method note mentions IdeS, IdeZ, or F(ab')2/Fc "
         "fragments, use RP LC-MS."
     )
+
+    st.markdown("#### New here?")
+    st.caption(
+        "Don't have a deconvolution file handy? Run the SEC LC-MS workflow on a small fabricated "
+        "example dataset to see the whole app - metrics, charts, tables, downloads - before "
+        "uploading anything of your own."
+    )
+    if st.button("▶ Try it with example data (SEC LC-MS)", key="home_try_example"):
+        mab_buf, adc_buf = build_example_files()
+        result = run_fragment_analysis(
+            mab_buf, adc_buf, EXAMPLE_PAYLOAD_DEFS, EXAMPLE_ABUNDANCE_THRESHOLD,
+            EXAMPLE_PPM_TOLERANCE, EXAMPLE_BASE_MASS_MODE, EXAMPLE_BASE_MASS_TOP_N,
+        )
+        if result is not None:
+            st.session_state["sec_results"] = result
+            st.session_state["_sec_results_are_example"] = True
+            if sec_page_obj is not None:
+                st.switch_page(sec_page_obj)

@@ -6,10 +6,14 @@ and validation this app is built on.
 
 ## Two independent pages
 
-The app opens on a **Home** page with two cards explaining each workflow and a
-button straight into each — useful for first-time users deciding which one
-applies. From there (or any time, via the sidebar navigation), there are two
-analysis pages, each with its own file uploads and settings:
+The app opens on a **Home** page with two cards explaining each workflow, a
+figure under each showing what that method actually does, and a button
+straight into each — useful for first-time users deciding which one applies.
+Home also has a **"Try it with example data"** button that runs the SEC
+workflow on a small fabricated dataset and jumps straight to the results, so
+someone can see the whole app - metrics, charts, tables, downloads - before
+uploading a real file. From there (or any time, via the sidebar navigation),
+there are two analysis pages, each with its own file uploads and settings:
 
 - **SEC LC-MS Analysis** — the original workflow: one naked-mAb reference file and
   one ADC file, analyzed as intact molecules.
@@ -140,13 +144,18 @@ instead of two — see "Two independent pages" above.
    keeping ambiguous flags manageable. The "Mass variants configured for this run"
    panel and the grid-size warning (shown if a configuration would build an unusually
    large number of theoretical species) are there to help you judge this.
-5. Click **Run DAR analysis**. Review any peaks flagged **ambiguous** (more
-   than one plausible species within tolerance) before trusting the reported
-   DAR — this is the automated version of the "does this look right?" check
-   that used to be a manual judgment call.
-6. Check the **Selection summary** table right below the DAR metrics: how
-   many ADC peaks were excluded by the abundance threshold, how many
-   candidates were matched vs. unmatched, as both a peak count and a %
+5. Click **Run DAR analysis**. Right under the DAR metrics, a small colored
+   badge gives an immediate sanity check — green "Clean match" if nothing
+   was flagged, amber if any peak was ambiguous or abundance-implausible.
+   It's a summary of the same counts covered in the two points below, shown
+   at the one place you're guaranteed to look (the DAR numbers themselves)
+   instead of only in an expander further down. Review any peaks flagged
+   **ambiguous** (more than one plausible species within tolerance) before
+   trusting the reported DAR — this is the automated version of the "does
+   this look right?" check that used to be a manual judgment call.
+6. Check the **Selection summary funnel and table** right below the DAR
+   metrics: how many ADC peaks were excluded by the abundance threshold, how
+   many candidates were matched vs. unmatched, as both a peak count and a %
    of total signal (Fractional Abundance). The two percentages can diverge
    a lot on purpose — matching a small fraction of peaks by count can still
    mean capturing nearly all of the real signal, since low-abundance noise

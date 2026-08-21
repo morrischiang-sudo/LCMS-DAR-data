@@ -175,11 +175,14 @@
 
   <section id="two-pages">
     <h2>2. Two independent pages</h2>
-    <p>DAR Compass opens on a <strong>Home</strong> page with a card for each workflow below and a
-      button straight into either one — a good starting point if you're not sure which applies to
-      your sample. From there, or any time via the sidebar navigation, there are two analysis
-      pages. Each has its own file uploads and settings — nothing you configure on one page
-      affects the other.</p>
+    <p>DAR Compass opens on a <strong>Home</strong> page with a card for each workflow below, a
+      figure under each showing what that method actually does, and a button straight into either
+      one — a good starting point if you're not sure which applies to your sample. Home also has a
+      <strong>"Try it with example data"</strong> button that runs the SEC workflow on a small
+      fabricated dataset and jumps straight to the results — useful for seeing the whole app before
+      uploading anything real (the results page says clearly that it's example data, not yours).
+      From there, or any time via the sidebar navigation, there are two analysis pages. Each has its
+      own file uploads and settings — nothing you configure on one page affects the other.</p>
     <div class="grid2">
       <div class="card">
         <h3 style="margin-top:0;">SEC LC-MS Analysis</h3>
@@ -333,18 +336,25 @@
           This only changes this chart; the table below and the DAR numbers above are identical either way.</p>
       </li>
       <li>
+        <h3>Check the sanity badge under the DAR metrics</h3>
+        <p>A small colored pill right below the DAR numbers: green "Clean match" if nothing was flagged,
+          amber if any peak was ambiguous or abundance-implausible, with the counts spelled out. It's a
+          summary of the two checks below, shown at the one place you're guaranteed to look — the DAR
+          numbers themselves — rather than only in an expander further down the page.</p>
+      </li>
+      <li>
         <h3>Review anything flagged ambiguous</h3>
         <p>If any matched peak could plausibly belong to more than one species within your tolerance, it's
           highlighted in the table and counted in a warning banner. Check these before reporting the DAR value.</p>
       </li>
       <li>
-        <h3>Check the Selection summary table</h3>
-        <p>A quick funnel: total ADC peaks → excluded by the abundance threshold → candidates → matched →
-          unmatched, shown as both a peak count and a % of total signal (Fractional Abundance). These two
-          percentages are meant to diverge sometimes — matching a small fraction of peaks by count can still
-          mean capturing nearly all of the real signal, since low-abundance noise peaks are expected to go
-          unmatched. A low peak-count % alongside a high signal % is normal and fine; a low signal % is the
-          one worth investigating in the verification table below.</p>
+        <h3>Check the Selection summary funnel and table</h3>
+        <p>A horizontal bar chart plus a table, both showing the same funnel: total ADC peaks → excluded by
+          the abundance threshold → candidates → matched → unmatched, as both a peak count and a % of total
+          signal (Fractional Abundance). These two percentages are meant to diverge sometimes — matching a
+          small fraction of peaks by count can still mean capturing nearly all of the real signal, since
+          low-abundance noise peaks are expected to go unmatched. A low peak-count % alongside a high signal
+          % is normal and fine; a low signal % is the one worth investigating in the verification table below.</p>
       </li>
       <li>
         <h3>Open "Peak-by-peak verification" if anything looks off</h3>

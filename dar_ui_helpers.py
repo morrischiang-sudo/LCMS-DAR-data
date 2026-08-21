@@ -21,6 +21,7 @@ import os
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -305,6 +306,70 @@ def make_drug_load_chart(long_df: pd.DataFrame, payload_defs: list[PayloadDef], 
     return fig
 
 
+def make_selection_funnel_chart(selection_summary: pd.DataFrame):
+    """Horizontal funnel of the three stages that actually narrow the peak
+    set down (skips the two "excluded"/"unmatched" bookkeeping rows, which
+    are the complement of stages already shown) - lets someone see at a
+    glance whether a run kept nearly all its signal or lost half of it,
+    without reading percentages across a table row by row.
+    """
+    keep_stages = [
+        "Total peaks in ADC file",
+        "Candidate peaks (passed threshold)",
+        "Matched to a theoretical species",
+    ]
+    short_labels = ["All peaks", "Above threshold", "Matched"]
+    sub = selection_summary.set_index("Stage").reindex(keep_stages)
+    if sub["Peak count"].isna().all():
+        return None
+
+    peak_pct = sub["% of peaks"].fillna(0).tolist()
+    signal_pct = sub["% of total signal (Fractional Abundance)"].fillna(0).tolist()
+
+    fig, ax = plt.subplots(figsize=(7, 2.2))
+    y = np.arange(len(short_labels))
+    bar_h = 0.32
+    ax.barh(y + bar_h / 2, peak_pct, height=bar_h, color="#8FAADC", label="% of peaks")
+    ax.barh(y - bar_h / 2, signal_pct, height=bar_h, color="#1B2A4A", label="% of total signal")
+    for yi, (pp, sp) in enumerate(zip(peak_pct, signal_pct)):
+        ax.text(pp + 1.5, yi + bar_h / 2, f"{pp:.0f}%", va="center", fontsize=9)
+        ax.text(sp + 1.5, yi - bar_h / 2, f"{sp:.0f}%", va="center", fontsize=9)
+    ax.set_yticks(y)
+    ax.set_yticklabels(short_labels)
+    ax.set_xlim(0, 115)
+    ax.set_xlabel("%")
+    ax.invert_yaxis()
+    ax.legend(loc="lower right", fontsize=8, frameon=False)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    plt.tight_layout()
+    return fig
+
+
+def render_dar_sanity_badge(n_ambiguous: int, n_implausible: int, exclude_implausible: bool) -> None:
+    """A small colored pill right under the DAR metrics - the one thing a
+    user is guaranteed to look at - so a caveat isn't only visible to
+    someone who scrolls down far enough to find the matched-species table.
+    """
+    if n_ambiguous == 0 and n_implausible == 0:
+        bg, fg, text = "#D9EAD3", "#274E13", "Clean match — 0 ambiguous, 0 flagged"
+    elif n_ambiguous == 0 and n_implausible > 0 and exclude_implausible:
+        bg, fg, text = "#CFE2F3", "#1B4F72", f"0 ambiguous · {n_implausible} flagged (excluded from DAR)"
+    else:
+        parts = []
+        if n_ambiguous:
+            parts.append(f"{n_ambiguous} ambiguous")
+        if n_implausible:
+            parts.append(f"{n_implausible} flagged")
+        bg, fg, text = "#FCE4D6", "#7F4B0D", " · ".join(parts) + " — review before trusting this DAR"
+
+    st.markdown(
+        f'<span style="background-color:{bg}; color:{fg}; padding:3px 12px; '
+        f'border-radius:999px; font-size:0.85rem; font-weight:600;">{text}</span>',
+        unsafe_allow_html=True,
+    )
+
+
 def style_drug_load_table(table: pd.DataFrame):
     count_cols = [c for c in table.columns if c != "Average"]
 
@@ -495,6 +560,7 @@ def render_results_section(r: dict, key_prefix: str, title_suffix: str = "") -> 
     cols[-1].metric(f"Total DAR{title_suffix}", f"{dar['total']:.2f}")
 
     n_ambiguous = int(matched_with_contrib["ambiguous"].sum()) if n_matched else 0
+    render_dar_sanity_badge(n_ambiguous, n_implausible, exclude_implausible)
 
     if n_implausible and not exclude_implausible:
         st.warning(
@@ -545,6 +611,9 @@ def render_results_section(r: dict, key_prefix: str, title_suffix: str = "") -> 
         "go unmatched. See \"Peak-by-peak verification\" above for the detail behind these numbers."
     )
     selection_summary = build_selection_summary(verification_df)
+    funnel_fig = make_selection_funnel_chart(selection_summary) if not selection_summary.empty else None
+    if funnel_fig is not None:
+        st.pyplot(funnel_fig)
     st.dataframe(
         selection_summary, use_container_width=True, hide_index=True,
         key=f"{key_prefix}_selection_summary",

@@ -124,6 +124,7 @@ def render() -> None:
         )
         if result is not None:
             st.session_state["sec_results"] = result
+            st.session_state["_sec_results_are_example"] = False
 
     if "sec_results" not in st.session_state:
         st.info(
@@ -133,5 +134,13 @@ def render() -> None:
             "with at least `Average Mass` and `Sum Intensity` columns."
         )
         st.stop()
+
+    if st.session_state.get("_sec_results_are_example"):
+        st.info(
+            "These results are from the **fabricated example dataset** on the Home page, not real "
+            "data - useful for seeing how the app works. Upload your own files and click **Run DAR "
+            "analysis** whenever you're ready.",
+            icon="\U0001F9EA",
+        )
 
     render_results_section(st.session_state["sec_results"], key_prefix="sec")
