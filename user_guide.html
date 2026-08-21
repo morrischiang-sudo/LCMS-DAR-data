@@ -137,13 +137,14 @@
     <h2>Contents</h2>
     <ol>
       <li><a href="#overview">1. What DAR Compass does</a></li>
-      <li><a href="#before-you-start">2. Before you start</a></li>
-      <li><a href="#walkthrough">3. Step-by-step walkthrough</a></li>
-      <li><a href="#results">4. Understanding your results</a></li>
-      <li><a href="#tips">5. Tips for reliable results</a></li>
-      <li><a href="#troubleshooting">6. Troubleshooting</a></li>
-      <li><a href="#running">7. Running the app</a></li>
-      <li><a href="#more">8. Where to learn more</a></li>
+      <li><a href="#two-pages">2. Two independent pages</a></li>
+      <li><a href="#before-you-start">3. Before you start</a></li>
+      <li><a href="#walkthrough">4. Step-by-step walkthrough</a></li>
+      <li><a href="#results">5. Understanding your results</a></li>
+      <li><a href="#tips">6. Tips for reliable results</a></li>
+      <li><a href="#troubleshooting">7. Troubleshooting</a></li>
+      <li><a href="#running">8. Running the app</a></li>
+      <li><a href="#more">9. Where to learn more</a></li>
     </ol>
   </nav>
 
@@ -172,8 +173,44 @@
     </p>
   </section>
 
+  <section id="two-pages">
+    <h2>2. Two independent pages</h2>
+    <p>DAR Compass has two pages, switchable from the sidebar navigation. Each has its own file
+      uploads and settings — nothing you configure on one page affects the other.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3 style="margin-top:0;">SEC LC-MS Analysis</h3>
+        <p>The original workflow: one naked-mAb reference file and one ADC file, analyzed as intact
+          molecules. Sections 3–7 below describe this page.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">RP LC-MS (IdeZ digestion)</h3>
+        <p>For samples digested with IdeS/IdeZ, a protease that cleaves an antibody below the hinge
+          into an F(ab')2 fragment (~100 kDa) and an Fc fragment. This localizes conjugation to a
+          specific region of the molecule and gives better MS sensitivity than analyzing the intact
+          ~150 kDa ADC — useful especially for site-specific conjugates
+          (Sjögren et al. 2016, <em>The Analyst</em>; Su et al. 2016, <em>Analytical Chemistry</em>).</p>
+      </div>
+    </div>
+    <p>The RP page needs <strong>four files</strong>: naked Ab and ADC, each split into F(ab')2 and
+      Fc. It runs the exact same matching/DAR engine as the SEC page, independently, once per
+      fragment — naked Ab F(ab')2 is the baseline for ADC F(ab')2, and naked Ab Fc is the baseline
+      for ADC Fc. Each linker-payload chemistry's MW and mass variant(s) are entered once and
+      shared between both fragments (it's the same physical payload), but the <strong>max
+      conjugation count</strong> is set independently per fragment, since where the payload
+      actually ends up is exactly what this analysis is for.</p>
+    <div class="callout warn">
+      <strong>F(ab')2 and Fc are reported as two fully separate results</strong> — there's no
+      combined "whole antibody" Total DAR. Combining them correctly depends on whether your Fc
+      data represents a full Fc dimer or a single Fc/2 subunit (one heavy chain's worth), which
+      varies by sample prep, so this page doesn't assume either. If you know your Fc stoichiometry
+      and want a combined number, you can add DAR(F(ab')2) and DAR(Fc) yourself, doubling the Fc
+      value first if your Fc file represents Fc/2.
+    </div>
+  </section>
+
   <section id="before-you-start">
-    <h2>2. Before you start</h2>
+    <h2>3. Before you start</h2>
     <h3>What files you need</h3>
     <p>Two Excel (<code>.xlsx</code>) files, each a deconvoluted intact-mass export (e.g. from Thermo BioPharma
       Finder or similar deconvolution software):</p>
@@ -199,7 +236,10 @@
   </section>
 
   <section id="walkthrough">
-    <h2>3. Step-by-step walkthrough</h2>
+    <h2>4. Step-by-step walkthrough</h2>
+    <p>This section describes the <strong>SEC LC-MS Analysis</strong> page. The
+      <strong>RP LC-MS (IdeZ digestion)</strong> page follows the exact same logic, just run twice
+      (once per fragment) with four files instead of two — see section 2 above.</p>
     <ol class="steps">
       <li>
         <h3>Upload your two files</h3>
@@ -312,7 +352,7 @@
   </section>
 
   <section id="results">
-    <h2>4. Understanding your results</h2>
+    <h2>5. Understanding your results</h2>
     <div class="grid2">
       <div class="card">
         <h3 style="margin-top:0;">DAR metrics</h3>
@@ -347,7 +387,7 @@
   </section>
 
   <section id="tips">
-    <h2>5. Tips for reliable results</h2>
+    <h2>6. Tips for reliable results</h2>
     <ul>
       <li><strong>Start with "Most abundant only"</strong> for the base mass setting. Add more variants only if
         you specifically need to account for minor glycoforms and you're seeing unmatched major peaks.</li>
@@ -367,7 +407,7 @@
   </section>
 
   <section id="troubleshooting">
-    <h2>6. Troubleshooting</h2>
+    <h2>7. Troubleshooting</h2>
     <dl class="faq">
       <dt>"Please upload both a mAb reference file and an ADC file"</dt>
       <dd>Both file slots in the sidebar need a file before you click Run — check neither was left empty.</dd>
@@ -392,7 +432,7 @@
   </section>
 
   <section id="running">
-    <h2>7. Running the app</h2>
+    <h2>8. Running the app</h2>
     <h3>On your own computer</h3>
     <pre><code>pip install -r requirements.txt
 streamlit run app.py</code></pre>
@@ -412,7 +452,7 @@ streamlit run app.py --server.address 0.0.0.0 --server.port 8501</code></pre>
   </section>
 
   <section id="more">
-    <h2>8. Where to learn more</h2>
+    <h2>9. Where to learn more</h2>
     <p>
       <code>DAR_platform_strategy_summary.md</code> covers the underlying methodology in more depth: how the
       manual spreadsheet workflow was reviewed, the specific issues found in it, how the matching algorithm was

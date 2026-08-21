@@ -4,6 +4,32 @@ Automated Drug-to-Antibody Ratio (DAR) distribution analysis from LC-MS deconvol
 intact-mass exports. See `DAR_platform_strategy_summary.md` for the background review
 and validation this app is built on.
 
+## Two independent pages
+
+The app has two pages, switchable from the sidebar navigation, each with its own
+file uploads and settings:
+
+- **SEC LC-MS Analysis** — the original workflow: one naked-mAb reference file and
+  one ADC file, analyzed as intact molecules.
+- **RP LC-MS (IdeZ digestion)** — for samples digested with IdeS/IdeZ, a protease
+  that cleaves an antibody below the hinge into an F(ab')2 fragment (~100 kDa) and
+  an Fc fragment. This localizes conjugation to a specific region of the molecule
+  and gives better MS sensitivity than analyzing the intact ~150 kDa ADC, which
+  matters most for site-specific conjugates (Sjögren et al. 2016, *The Analyst*;
+  Su et al. 2016, *Analytical Chemistry*). This page needs four files — naked Ab
+  and ADC, each split into F(ab')2 and Fc — and runs the exact same matching/DAR
+  engine as the SEC page, independently, once per fragment: naked Ab F(ab')2 is
+  the baseline for ADC F(ab')2, and naked Ab Fc is the baseline for ADC Fc.
+  F(ab')2 and Fc are reported as two fully separate results with no combined
+  "whole antibody" total — combining them correctly depends on whether your Fc
+  data represents a full Fc dimer or a single Fc/2 subunit, which varies by
+  sample prep, so this page doesn't assume either.
+
+  On this page, each linker-payload chemistry's MW and mass variant(s) are entered
+  once and shared between both fragments (it's the same physical payload), but the
+  **max conjugation count** is set independently per fragment — since where the
+  payload actually ends up is exactly what this analysis is for.
+
 ## Quick start (local, single user)
 
 ```bash
@@ -59,7 +85,11 @@ If your organization has a policy on hosting internal R&D data on third-party cl
 services (even transiently, in memory), it's worth confirming this is fine before
 deploying — that's a compliance question, not a technical one.
 
-## How to use it
+## How to use the SEC LC-MS Analysis page
+
+The steps below describe the SEC LC-MS page. The RP LC-MS (IdeZ digestion) page
+follows the exact same logic, just run twice (once per fragment) with four files
+instead of two — see "Two independent pages" above.
 
 1. Upload the naked mAb reference deconvolution export (`.xlsx`) and the ADC
    deconvolution export (`.xlsx`) in the sidebar. Both need at least
@@ -145,8 +175,13 @@ deploying — that's a compliance question, not a technical one.
 
 ## Files in this delivery
 
-- `app.py` — the Streamlit UI (includes an optional `APP_PASSWORD`-gated login, active only
-  when that environment variable/secret is set — see the Render section above)
+- `app.py` — thin router that defines the two pages (via `st.navigation`) and applies
+  the optional `APP_PASSWORD`-gated login, active only when that environment
+  variable/secret is set — see the Render section above
+- `sec_page.py` — the SEC LC-MS Analysis page
+- `rp_page.py` — the RP LC-MS (IdeZ digestion) Analysis page
+- `dar_ui_helpers.py` — shared UI building blocks (password gate, chart/table
+  builders, the single-fragment analysis pipeline both pages call) used by both pages
 - `dar_calculator.py` — the underlying matching/DAR engine (also usable standalone/scripted)
 - `requirements.txt` — pinned dependencies
 - `render.yaml` — Render Blueprint for one-step deployment (see Render section above)
@@ -163,9 +198,13 @@ deploying — that's a compliance question, not a technical one.
 
 ## Known limitations / next steps
 
-- Fragment/subunit-ion cross-validation (light chain, heavy chain, half-antibody) is
-  not yet implemented — it needs user-supplied expected fragment masses. Planned as
-  a phase-2 module (see strategy summary, section 5).
+- The RP LC-MS page covers IdeS/IdeZ digestion (F(ab')2 + Fc). Reduced subunit
+  analysis (light chain + Fd, from further reducing F(ab')2) is not yet
+  implemented — it would need its own baseline files and its own page, same
+  pattern as the RP page.
+- There's no combined "whole antibody" Total DAR on the RP page by design (see
+  "Two independent pages" above) — if you later confirm your Fc data's exact
+  stoichiometry (full dimer vs. Fc/2), a combined total could be added.
 - No persistence/database yet — each run is stateless. If the team wants a history
   of past runs, that's a natural next feature (e.g. SQLite or a shared folder of
   saved reports).
