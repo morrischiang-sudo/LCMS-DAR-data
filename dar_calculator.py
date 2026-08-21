@@ -463,6 +463,70 @@ def calculate_dar(matched_df: pd.DataFrame, payload_defs: Sequence[PayloadDef], 
     return dar, out
 
 
+def flag_abundance_implausible(matched_df: pd.DataFrame, payload_defs: Sequence[PayloadDef]) -> pd.DataFrame:
+    """Flag matched species that use a breakage (non-intact) mass variant
+    but are MORE abundant than the fully-intact species at the same total
+    conjugation count, all other chemistries held equal.
+
+    Breakage is expected to be a minority pathway relative to the intact
+    population it derives from - if a partially-broken combination is
+    dramatically more abundant than its intact counterpart at the same
+    total, that's a strong sign the match is a spurious combinatorial
+    coincidence (an artifact of the denser theoretical grid that multiple
+    mass variants create) rather than a real breakage species. Run this
+    after `calculate_dar` - it needs the `relative_abundance` column.
+
+    This is a heuristic QC flag, not a hard rule: it assumes breakage is a
+    minor side reaction relative to the intact population, which won't hold
+    for every sample (e.g. one deliberately forced to degrade). Nothing is
+    removed or reweighted here - it only adds two columns:
+      - 'abundance_implausible' (bool)
+      - 'implausible_detail' (str, human-readable explanation; empty if False)
+    """
+    out = matched_df.copy()
+    out["abundance_implausible"] = False
+    out["implausible_detail"] = ""
+
+    if out.empty:
+        return out
+
+    multi_variant_chems = [p for p in payload_defs if len(p.variants) > 1]
+    if not multi_variant_chems:
+        return out
+
+    def state_col(p: PayloadDef) -> str:
+        return f"n_{p.label}_total" if len(p.variants) > 1 else f"n_{p.variants[0].variant_label}"
+
+    for p in multi_variant_chems:
+        total_col = state_col(p)
+        intact_col = f"n_{p.variants[0].variant_label}"
+        other_state_cols = [state_col(q) for q in payload_defs if q.label != p.label]
+
+        uses_breakage = out[total_col] != out[intact_col]
+        if not uses_breakage.any():
+            continue
+
+        for idx in out.index[uses_breakage]:
+            row = out.loc[idx]
+            same_state = (out[total_col] == row[total_col])
+            for oc in other_state_cols:
+                same_state &= (out[oc] == row[oc])
+            fully_intact = same_state & (out[intact_col] == out[total_col])
+            reference_abundance = out.loc[fully_intact, "relative_abundance"].sum()
+
+            if row["relative_abundance"] > reference_abundance:
+                out.at[idx, "abundance_implausible"] = True
+                detail = (
+                    f"{p.label}: this species' relative abundance ({row['relative_abundance'] * 100:.2f}%) "
+                    f"exceeds the fully-intact {int(row[total_col])}[{p.label}] species at the same "
+                    f"conjugation state ({reference_abundance * 100:.2f}%)."
+                )
+                existing = out.at[idx, "implausible_detail"]
+                out.at[idx, "implausible_detail"] = f"{existing}; {detail}" if existing else detail
+
+    return out
+
+
 def consolidate_by_total_count(
     matched_df: pd.DataFrame,
     payload_defs: Sequence[PayloadDef],

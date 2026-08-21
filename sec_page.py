@@ -87,6 +87,21 @@ def render() -> None:
     if base_mass_mode.startswith("Top N"):
         base_mass_top_n = st.sidebar.number_input("N", min_value=1, max_value=10, value=3, step=1, key="sec_base_mass_topn")
 
+    exclude_implausible = False
+    if any(len(p.variants) > 1 for p in payload_defs):
+        exclude_implausible = st.sidebar.checkbox(
+            "Exclude abundance-implausible species from DAR",
+            value=False, key="sec_exclude_implausible",
+            help=(
+                "A breakage-derived species (using a non-intact mass variant) is flagged "
+                "\"abundance-implausible\" if it's more abundant than the fully-intact species at "
+                "the same conjugation state - usually a sign the match is a spurious combinatorial "
+                "coincidence rather than a real breakage species. Off by default (flagged species "
+                "still count toward DAR, just highlighted for review); turn on to remove them from "
+                "the DAR calculation entirely."
+            ),
+        )
+
     run_clicked = st.sidebar.button("Run DAR analysis", type="primary", use_container_width=True, key="sec_run")
 
     # ----------------------------------------------------------------------
@@ -105,6 +120,7 @@ def render() -> None:
         result = run_fragment_analysis(
             mab_file, adc_file, payload_defs, adc_min_fractional_abundance,
             ppm_tolerance, base_mass_mode, base_mass_top_n,
+            exclude_implausible=exclude_implausible,
         )
         if result is not None:
             st.session_state["sec_results"] = result

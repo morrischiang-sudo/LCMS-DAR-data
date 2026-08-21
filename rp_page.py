@@ -124,6 +124,21 @@ def render() -> None:
     if base_mass_mode.startswith("Top N"):
         base_mass_top_n = st.sidebar.number_input("N", min_value=1, max_value=10, value=3, step=1, key="rp_base_mass_topn")
 
+    exclude_implausible = False
+    if any(len(p.variants) > 1 for p in payload_defs_fab2):
+        exclude_implausible = st.sidebar.checkbox(
+            "Exclude abundance-implausible species from DAR",
+            value=False, key="rp_exclude_implausible",
+            help=(
+                "A breakage-derived species (using a non-intact mass variant) is flagged "
+                "\"abundance-implausible\" if it's more abundant than the fully-intact species at "
+                "the same conjugation state - usually a sign the match is a spurious combinatorial "
+                "coincidence rather than a real breakage species. Off by default (flagged species "
+                "still count toward DAR, just highlighted for review); turn on to remove them from "
+                "the DAR calculation entirely. Applied to both fragments."
+            ),
+        )
+
     run_clicked = st.sidebar.button("Run RP LC-MS analysis", type="primary", use_container_width=True, key="rp_run")
 
     # ----------------------------------------------------------------------
@@ -144,10 +159,12 @@ def render() -> None:
         result_fab2 = run_fragment_analysis(
             mab_fab2_file, adc_fab2_file, payload_defs_fab2, adc_min_fractional_abundance,
             ppm_tolerance, base_mass_mode, base_mass_top_n,
+            exclude_implausible=exclude_implausible,
         )
         result_fc = run_fragment_analysis(
             mab_fc_file, adc_fc_file, payload_defs_fc, adc_min_fractional_abundance,
             ppm_tolerance, base_mass_mode, base_mass_top_n,
+            exclude_implausible=exclude_implausible,
         )
         if result_fab2 is not None:
             st.session_state["rp_results_fab2"] = result_fab2

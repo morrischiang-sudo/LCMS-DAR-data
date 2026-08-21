@@ -106,6 +106,19 @@ instead of two — see "Two independent pages" above.
    its own **DAR weight** (1.0 = counts as a full payload like today; lower or 0.0
    if that broken form represents partial or total payload loss — this is a
    chemistry-specific call only you can make).
+
+   Once a chemistry has more than one mass variant, a checkbox appears:
+   **"Exclude abundance-implausible species from DAR"**. A breakage-derived species
+   (using a non-intact variant) is flagged "abundance-implausible" if it's *more*
+   abundant than the fully-intact species at the same total conjugation count —
+   breakage is expected to be a minority pathway relative to the intact population
+   it derives from, so this pattern usually means the match is a spurious
+   combinatorial coincidence (an artifact of the denser theoretical grid multiple
+   variants create), not a real species. Off by default — flagged species still
+   count toward DAR, just highlighted in a dedicated "Abundance-implausible
+   species" panel for review; turn the checkbox on to remove them from the DAR
+   calculation entirely. This is a heuristic, not a hard rule — it can be wrong for
+   a sample deliberately forced to degrade.
 3. Optionally set the **ADC fractional abundance threshold (%)**. Only ADC peaks
    at or above this value are treated as candidate species before matching —
    useful for ignoring very low-abundance/noise peaks up front. Leave at 0 to

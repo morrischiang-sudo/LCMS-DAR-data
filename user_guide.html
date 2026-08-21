@@ -288,6 +288,21 @@
         </div>
       </li>
       <li>
+        <h3>Decide whether to exclude abundance-implausible species (only shown with multiple mass variants)</h3>
+        <p>A breakage-derived species is flagged <strong>abundance-implausible</strong> if it's more abundant
+          than the fully-intact species at the same total conjugation count — breakage is expected to be a
+          minority pathway relative to the intact population it derives from, so a broken form dramatically
+          outweighing its intact counterpart usually means the match is a spurious combinatorial coincidence,
+          not a real species. The checkbox <strong>"Exclude abundance-implausible species from DAR"</strong> is
+          off by default: flagged species are highlighted for review but still count toward DAR. Turn it on to
+          remove them from the calculation entirely.</p>
+        <div class="callout warn">
+          This is a heuristic, not a hard rule — it assumes breakage is a minor side reaction relative to the
+          intact population. That assumption can be wrong for a sample deliberately forced to degrade, so review
+          the flagged species in the "Abundance-implausible species" panel rather than trusting the checkbox blindly.
+        </div>
+      </li>
+      <li>
         <h3>Choose how many mAb base masses to use</h3>
         <p><strong>Most abundant only</strong> (recommended) anchors everything to the single dominant mAb mass.
           <strong>Top N variants</strong> includes minor glycoform/adduct masses too — useful for exploratory runs,
@@ -384,6 +399,13 @@
       chemistry, expect more ambiguous flags than usual (see the tolerance note in Step 5 of the walkthrough) —
       it's a sign to tighten tolerance or simplify the configuration, not necessarily a data problem.
     </div>
+    <h3>Abundance-implausible species panel</h3>
+    <p>Only appears when at least one species is flagged. Rows shaded purple in the matched-species table
+      (purple takes visual priority over the ambiguous orange, if a row happens to be both) are breakage-derived
+      species that are more abundant than their fully-intact counterpart at the same total conjugation count —
+      review the <code>implausible_detail</code> column for exactly what each one is being compared against.
+      Whether these still count toward DAR depends on the "Exclude abundance-implausible species" checkbox in
+      the sidebar (Step 5).</p>
   </section>
 
   <section id="tips">
@@ -403,6 +425,9 @@
       <li><strong>Cross-check Total DAR against expectation.</strong> If your conjugation chemistry caps out at,
         say, 8 sites, a Total DAR far outside a plausible range is a sign to review the ambiguous matches or
         reconsider the payload/MW inputs.</li>
+      <li><strong>Review the abundance-implausible panel before turning on its exclusion checkbox.</strong> It's
+        a strong heuristic (breakage should be rarer than the intact form it derives from), not a guarantee —
+        skim the flagged species first, especially if your sample was deliberately stressed to induce breakage.</li>
     </ul>
   </section>
 

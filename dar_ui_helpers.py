@@ -34,6 +34,7 @@ from dar_calculator import (
     consolidate_by_total_count,
     estimate_theoretical_grid_size,
     filter_by_fractional_abundance,
+    flag_abundance_implausible,
     marginal_distribution_by_chemistry,
     match_species,
     build_drug_load_summary_table,
@@ -174,6 +175,7 @@ def run_fragment_analysis(
     ppm_tolerance: float,
     base_mass_mode: str,
     base_mass_top_n: int,
+    exclude_implausible: bool = False,
 ) -> dict | None:
     """Run the full matching/DAR pipeline for one fragment (or, on the SEC
     page, for the whole intact molecule - structurally identical, just one
@@ -212,7 +214,19 @@ def run_fragment_analysis(
     estimated_grid_size = estimate_theoretical_grid_size(base_masses, payload_defs)
     theoretical = build_theoretical_table(base_masses, payload_defs)
     matched = match_species(adc_df, theoretical, ppm_tolerance=ppm_tolerance)
-    dar, matched_with_contrib = calculate_dar(matched, payload_defs)
+    dar_full, matched_full = calculate_dar(matched, payload_defs)
+    matched_full = flag_abundance_implausible(matched_full, payload_defs)
+
+    implausible_mask = matched_full["abundance_implausible"] if not matched_full.empty else pd.Series(dtype=bool)
+    n_implausible = int(implausible_mask.sum()) if len(implausible_mask) else 0
+    implausible_rows = matched_full[implausible_mask].copy() if n_implausible else matched_full.iloc[0:0].copy()
+
+    if exclude_implausible and n_implausible:
+        filtered = matched_full[~implausible_mask].copy()
+        dar, matched_with_contrib = calculate_dar(filtered, payload_defs)
+        matched_with_contrib = flag_abundance_implausible(matched_with_contrib, payload_defs)
+    else:
+        dar, matched_with_contrib = dar_full, matched_full
 
     n_display_cols: list[str] = []
     for p in payload_defs:
@@ -231,6 +245,9 @@ def run_fragment_analysis(
         "payload_labels": [p.label for p in payload_defs],
         "dar": dar,
         "matched_with_contrib": matched_with_contrib,
+        "n_implausible": n_implausible,
+        "implausible_rows": implausible_rows,
+        "exclude_implausible": exclude_implausible,
         "base_masses": base_masses,
         "base_mass_mode": base_mass_mode,
         "theoretical": theoretical,
@@ -355,6 +372,7 @@ def to_excel_bytes(
     theoretical_df: pd.DataFrame | None = None,
     verification_df: pd.DataFrame | None = None,
     selection_summary_df: pd.DataFrame | None = None,
+    implausible_df: pd.DataFrame | None = None,
 ) -> bytes:
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
@@ -369,12 +387,19 @@ def to_excel_bytes(
             ws = writer.book.create_sheet("Analysis")
             row = write_labeled_block(ws, "Analysis Parameters", params_df, 1)
             row = write_labeled_block(ws, "Theoretical Mass Combinations (all permutations)", theoretical_df, row)
-            write_labeled_block(
+            row = write_labeled_block(
                 ws,
                 "Peak-by-Peak Verification (every candidate peak, matched or not)",
                 verification_df,
                 row,
             )
+            if implausible_df is not None and not implausible_df.empty:
+                write_labeled_block(
+                    ws,
+                    "Abundance-Implausible Species (breakage-derived, more abundant than their intact counterpart)",
+                    implausible_df,
+                    row,
+                )
     return buf.getvalue()
 
 
@@ -396,6 +421,9 @@ def render_results_section(r: dict, key_prefix: str, title_suffix: str = "") -> 
     payload_labels = r["payload_labels"]
     dar = r["dar"]
     matched_with_contrib = r["matched_with_contrib"]
+    n_implausible = r.get("n_implausible", 0)
+    implausible_rows = r.get("implausible_rows")
+    exclude_implausible = r.get("exclude_implausible", False)
     base_masses = r["base_masses"]
     base_mass_mode = r["base_mass_mode"]
     theoretical = r["theoretical"]
@@ -467,6 +495,46 @@ def render_results_section(r: dict, key_prefix: str, title_suffix: str = "") -> 
     cols[-1].metric(f"Total DAR{title_suffix}", f"{dar['total']:.2f}")
 
     n_ambiguous = int(matched_with_contrib["ambiguous"].sum()) if n_matched else 0
+
+    if n_implausible and not exclude_implausible:
+        st.warning(
+            f"{n_implausible} matched peak(s) flagged abundance-implausible{title_suffix}: a "
+            "breakage-derived species is more abundant than the fully-intact species at the same "
+            "conjugation state, which usually means the match is a spurious combinatorial "
+            "coincidence rather than a real breakage species. Currently INCLUDED in the DAR "
+            "calculation above - see \"Abundance-implausible species\" below, and the checkbox in "
+            "the sidebar if you want to exclude them."
+        )
+    elif n_implausible and exclude_implausible:
+        st.info(
+            f"{n_implausible} peak(s) were flagged abundance-implausible{title_suffix} and have "
+            "been EXCLUDED from the DAR calculation above, per the sidebar setting. See "
+            "\"Abundance-implausible species\" below for what was removed."
+        )
+
+    if n_implausible:
+        with st.expander(f"Abundance-implausible species{title_suffix} ({n_implausible} flagged)"):
+            st.caption(
+                "Breakage-derived species (using a non-intact mass variant) that are more abundant "
+                "than the fully-intact species at the same total conjugation count, other "
+                "chemistries held equal. Breakage is expected to be a minority pathway relative to "
+                "the intact population it derives from, so this pattern usually means the match is "
+                "an artifact of the denser theoretical grid multiple mass variants create, not a "
+                "real species. This is a heuristic, not a hard rule - it can be wrong for a sample "
+                "deliberately forced to degrade."
+            )
+            implausible_display_cols = [
+                "Average Mass", "Sum Intensity", "species", "relative_abundance", "implausible_detail",
+            ]
+            implausible_display_cols = [c for c in implausible_display_cols if c in implausible_rows.columns]
+            display_implausible = implausible_rows[implausible_display_cols].copy()
+            if "relative_abundance" in display_implausible.columns:
+                display_implausible["relative_abundance"] = (display_implausible["relative_abundance"] * 100).round(2)
+                display_implausible = display_implausible.rename(columns={"relative_abundance": "relative_abundance_%"})
+            st.dataframe(
+                display_implausible, use_container_width=True, hide_index=True,
+                key=f"{key_prefix}_implausible_table",
+            )
 
     # --- Selection summary -----------------------------------------------
     st.subheader(f"Selection summary{title_suffix}")
@@ -547,15 +615,23 @@ def render_results_section(r: dict, key_prefix: str, title_suffix: str = "") -> 
         display_cols = ["Average Mass", "Sum Intensity", "species", "ppm_error", "relative_abundance"]
         display_cols += n_display_cols
         display_cols += ["ambiguous", "runner_up_species", "runner_up_ppm_error"]
+        if "abundance_implausible" in matched_with_contrib.columns:
+            display_cols += ["abundance_implausible"]
         display_df = matched_with_contrib[display_cols].copy()
         display_df["relative_abundance"] = (display_df["relative_abundance"] * 100).round(2)
         display_df = display_df.rename(columns={"relative_abundance": "relative_abundance_%"})
 
-        def highlight_ambiguous(row):
-            return ["background-color: #FCE4D6" if row["ambiguous"] else "" for _ in row]
+        def highlight_row(row):
+            if row.get("abundance_implausible"):
+                color = "#E6D9F2"  # purple - abundance-implausible takes visual priority
+            elif row["ambiguous"]:
+                color = "#FCE4D6"  # orange - mass-ambiguous
+            else:
+                color = ""
+            return [f"background-color: {color}" if color else "" for _ in row]
 
         st.dataframe(
-            display_df.style.apply(highlight_ambiguous, axis=1), use_container_width=True,
+            display_df.style.apply(highlight_row, axis=1), use_container_width=True,
             key=f"{key_prefix}_matched_species_table",
         )
     else:
@@ -568,12 +644,14 @@ def render_results_section(r: dict, key_prefix: str, title_suffix: str = "") -> 
             "metric": [f"DAR [{lbl}]" for lbl in payload_labels] + [
                 "Total DAR", "Matched peaks", "Candidate peaks (after abundance filter)",
                 "Observed peaks (raw file)", "ADC fractional abundance threshold (%)",
-                "Ambiguous matches", "ppm tolerance used",
+                "Ambiguous matches", "Abundance-implausible flagged", "Abundance-implausible excluded from DAR",
+                "ppm tolerance used",
             ],
             "value": [round(dar[lbl], 3) for lbl in payload_labels] + [
                 round(dar["total"], 3), n_matched, n_candidates,
                 n_observed, adc_min_fractional_abundance,
-                n_ambiguous, ppm_tolerance,
+                n_ambiguous, n_implausible, exclude_implausible,
+                ppm_tolerance,
             ],
         }
     )
@@ -588,7 +666,7 @@ def render_results_section(r: dict, key_prefix: str, title_suffix: str = "") -> 
             data=to_excel_bytes(
                 summary_df, matched_with_contrib, drug_load_table,
                 params_df=params_df, theoretical_df=theoretical, verification_df=verification_df,
-                selection_summary_df=selection_summary,
+                selection_summary_df=selection_summary, implausible_df=implausible_rows,
             ),
             file_name=f"dar_report_{file_tag}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
