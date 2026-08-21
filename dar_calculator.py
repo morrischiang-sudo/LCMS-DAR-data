@@ -326,6 +326,54 @@ def match_species(
     return matched.sort_values("Sum Intensity", ascending=False).reset_index(drop=True) if len(matched) else matched
 
 
+def build_verification_table(
+    observed_df: pd.DataFrame,
+    theoretical_df: pd.DataFrame,
+    ppm_tolerance: float,
+    mass_col: str = "Average Mass",
+    abundance_threshold: float = 0.0,
+    abundance_col: str | None = None,
+) -> pd.DataFrame:
+    """Full audit trail: every peak in `observed_df` (matched or not), with
+    its closest theoretical candidate, delta mass, ppm error, and pass/fail
+    flags - so a researcher can verify (or debug) exactly why any given peak
+    was or wasn't counted, including peaks excluded by the fractional
+    abundance threshold before matching even started.
+
+    Unlike `match_species`, nothing here is filtered out: a peak whose
+    closest theoretical mass is thousands of ppm away still gets a row,
+    showing that value plainly. This is deliberate - it's what makes it
+    possible to notice, for example, that a configured chemistry's max
+    conjugation count was set too low to reach a peak's true species,
+    rather than silently dropping that peak with no trace.
+    """
+    if abundance_col is None:
+        abundance_col = "Fractional Abundance" if "Fractional Abundance" in observed_df.columns else "Relative Abundance"
+
+    theo_masses = theoretical_df["theoretical_mass"].to_numpy()
+    theo_labels = theoretical_df["label"].to_numpy()
+
+    rows = []
+    for _, row in observed_df.iterrows():
+        om = row[mass_col]
+        ppm_errors = np.abs((theo_masses - om) / theo_masses) * 1e6
+        idx = int(np.argmin(ppm_errors))
+
+        rec = row.to_dict()
+        rec["closest_theoretical_mass"] = theo_masses[idx]
+        rec["closest_species"] = theo_labels[idx]
+        rec["delta_mass"] = om - theo_masses[idx]
+        rec["ppm_error"] = ppm_errors[idx]
+
+        abundance_value = row.get(abundance_col)
+        rec["passed_abundance_threshold"] = bool(abundance_value is None or abundance_value >= abundance_threshold)
+        rec["within_ppm_tolerance"] = bool(ppm_errors[idx] <= ppm_tolerance)
+        rec["matched"] = bool(rec["passed_abundance_threshold"] and rec["within_ppm_tolerance"])
+        rows.append(rec)
+
+    return pd.DataFrame(rows).sort_values(mass_col).reset_index(drop=True)
+
+
 # --------------------------------------------------------------------------
 # DAR calculation
 # --------------------------------------------------------------------------

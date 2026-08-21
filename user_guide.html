@@ -280,10 +280,24 @@
           highlighted in the table and counted in a warning banner. Check these before reporting the DAR value.</p>
       </li>
       <li>
+        <h3>Open "Peak-by-peak verification" if anything looks off</h3>
+        <p>Lists <em>every</em> peak in the ADC file, matched or not, with its closest theoretical species and
+          ppm error. Rows are color-coded: <span class="swatch" style="background:#D9EAD3;"></span>green = matched,
+          <span class="swatch" style="background:#FFF2CC;"></span>yellow = excluded by the fractional abundance
+          threshold before matching started, <span class="swatch" style="background:#F4CCCC;"></span>red = passed
+          that threshold but still too far in ppm from anything in the theoretical grid. A red row on a peak you
+          expected to match almost always means a chemistry's max conjugation count (or a mass variant's MW)
+          needs adjusting — the theoretical grid simply doesn't reach that peak yet, rather than the peak being
+          noise. This is exactly the signal that caught a real misconfigured max-conjugation-count issue in
+          practice (see <code>ACE723_discrepancy_diagnosis.md</code> for the full worked example).</p>
+      </li>
+      <li>
         <h3>Download your report</h3>
-        <p>Use the download buttons to save the DAR report as an Excel file (summary + drug-load distribution +
-          full matched-species table, each on its own sheet) and both charts as PNGs, for your records or an
-          ELN/LIMS entry.</p>
+        <p>Use the download buttons to save the DAR report as an Excel file — summary, drug-load distribution,
+          full matched-species table, and now an <strong>Analysis</strong> sheet with every parameter used, the
+          full theoretical mass grid, and the same peak-by-peak verification table, each on its own sheet — plus
+          both charts as PNGs, for your records, an ELN/LIMS entry, or so someone else can check the result by
+          hand without re-running anything.</p>
       </li>
     </ol>
   </section>

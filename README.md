@@ -99,7 +99,17 @@ deploying — that's a compliance question, not a technical one.
    than one plausible species within tolerance) before trusting the reported
    DAR — this is the automated version of the "does this look right?" check
    that used to be a manual judgment call.
-6. Check the **Drug-load distribution** table and chart: one row/panel per
+6. Open **"Peak-by-peak verification"** if a result looks off, or just to
+   sanity-check a run. It lists every peak in the ADC file — matched or not —
+   with its closest theoretical species and ppm error, color-coded: green =
+   matched, yellow = excluded by the fractional abundance threshold before
+   matching started, red = passed that threshold but still too far in ppm
+   from anything in the theoretical grid. A red row on a peak you expected
+   to match almost always means a chemistry's max conjugation count (or a
+   mass variant's MW) needs adjusting — the grid simply doesn't reach that
+   peak yet, rather than the peak being noise. This is what caught the
+   ACE723 max-conjugation-count issue.
+7. Check the **Drug-load distribution** table and chart: one row/panel per
    chemistry, one column per count (0, 1, 2, ...), showing the % of matched
    intensity at each count independent of the other chemistries, plus an
    Average column (the same DAR number as the metric above). This is the
@@ -108,7 +118,7 @@ deploying — that's a compliance question, not a technical one.
    the modal count highlighted. If a chemistry has a mass variant with a
    DAR weight other than 1.0, a note explains why the row's simple mean
    won't exactly equal the Average column.
-7. If any chemistry has more than one mass variant configured, a **Chart detail**
+8. If any chemistry has more than one mass variant configured, a **Chart detail**
    toggle also appears above the species-level distribution chart further down:
    **Detailed** shows every intact/broken mixture as its own bar (precise, but
    can get crowded); **Consolidated** groups bars by total occupied-site count
@@ -117,8 +127,11 @@ deploying — that's a compliance question, not a technical one.
    either way. Results stay on screen while you switch this (or any other
    widget) back and forth; only clicking **Run DAR analysis** again recomputes
    them.
-8. Download the DAR report (Excel, now including the drug-load distribution
-   as its own sheet) and both charts (PNG) for your records.
+9. Download the DAR report (Excel) and both charts (PNG) for your records.
+   The Excel file now includes an **Analysis** sheet — every parameter used,
+   the full theoretical mass grid (every permutation the matching considered),
+   and the same peak-by-peak verification table from step 6 — so someone
+   else can check the result by hand without re-running anything.
 
 ## Files in this delivery
 
@@ -129,6 +142,11 @@ deploying — that's a compliance question, not a technical one.
 - `render.yaml` — Render Blueprint for one-step deployment (see Render section above)
 - `DAR_platform_strategy_summary.md` — the workflow review, validation results, and
   platform design recommendations this app implements
+- `DAR_Compass_Parameter_Dictionary.xlsx` — canonical parameter names, definitions, and
+  formulas, for aligning input data across different source instruments/software
+- `ACE723_discrepancy_diagnosis.md` — a worked example of using the peak-by-peak
+  verification table to diagnose a real app-vs-manual discrepancy (a misconfigured
+  max conjugation count) end to end
 - `results_A090412.xlsx`, `results_A090512.xlsx`, `results_A090412_from_raw_files.xlsx`,
   and their matching `dar_distribution_*.png` charts — the validation runs referenced
   in the strategy summary

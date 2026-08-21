@@ -24,6 +24,7 @@ from dar_calculator import (
     base_masses_from_mab,
     build_drug_load_summary_table,
     build_theoretical_table,
+    build_verification_table,
     calculate_dar,
     consolidate_by_total_count,
     estimate_theoretical_grid_size,
@@ -147,13 +148,76 @@ def style_drug_load_table(table: pd.DataFrame):
     return table.style.apply(highlight_mode, axis=1).format("{:.2f}", na_rep="")
 
 
-def to_excel_bytes(summary_df: pd.DataFrame, species_df: pd.DataFrame, drug_load_df: pd.DataFrame | None = None) -> bytes:
+def build_params_table(
+    payload_defs: list[PayloadDef],
+    base_masses: list[float],
+    base_mass_mode: str,
+    ppm_tolerance: float,
+    adc_min_fractional_abundance: float,
+) -> pd.DataFrame:
+    """One row per analysis parameter, in the same spirit as the header
+    block of a manual analysis sheet - so someone reviewing the output can
+    see exactly what was configured without having to ask.
+    """
+    rows = [
+        {"Parameter": "mAb base mass mode", "Value": base_mass_mode},
+        {"Parameter": "mAb base mass(es) used (Da)", "Value": ", ".join(f"{b:.4f}" for b in base_masses)},
+        {"Parameter": "Mass accuracy tolerance (ppm)", "Value": ppm_tolerance},
+        {"Parameter": "ADC fractional abundance threshold (%)", "Value": adc_min_fractional_abundance},
+    ]
+    for p in payload_defs:
+        rows.append({"Parameter": f"Chemistry \"{p.label}\" - max conjugation count", "Value": max(p.n_values) if p.n_values else 0})
+        rows.append({"Parameter": f"Chemistry \"{p.label}\" - count step", "Value": (p.n_values[1] - p.n_values[0]) if len(p.n_values) > 1 else 1})
+        for v in p.variants:
+            rows.append({
+                "Parameter": f"Chemistry \"{p.label}\" - mass variant \"{v.variant_label}\"",
+                "Value": f"MW = {v.mw:.4f} Da, DAR weight = {v.dar_weight}",
+            })
+    return pd.DataFrame(rows)
+
+
+def write_labeled_block(ws, title: str, df: pd.DataFrame, start_row: int) -> int:
+    """Write a titled table starting at `start_row`; return the next free row."""
+    from openpyxl.styles import Font
+    ws.cell(row=start_row, column=1, value=title).font = Font(bold=True, size=12)
+    start_row += 1
+    if df is None or df.empty:
+        ws.cell(row=start_row, column=1, value="(none)")
+        return start_row + 2
+
+    for j, col in enumerate(df.columns, start=1):
+        ws.cell(row=start_row, column=j, value=str(col)).font = Font(bold=True)
+    for i, (_, row) in enumerate(df.iterrows(), start=start_row + 1):
+        for j, val in enumerate(row.tolist(), start=1):
+            ws.cell(row=i, column=j, value=val)
+    return start_row + len(df) + 3
+
+
+def to_excel_bytes(
+    summary_df: pd.DataFrame,
+    species_df: pd.DataFrame,
+    drug_load_df: pd.DataFrame | None = None,
+    params_df: pd.DataFrame | None = None,
+    theoretical_df: pd.DataFrame | None = None,
+    verification_df: pd.DataFrame | None = None,
+) -> bytes:
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         summary_df.to_excel(writer, sheet_name="DAR Summary", index=False)
         if drug_load_df is not None and not drug_load_df.empty:
             drug_load_df.to_excel(writer, sheet_name="Drug-load Distribution")
         species_df.to_excel(writer, sheet_name="Matched Species", index=False)
+
+        if params_df is not None:
+            ws = writer.book.create_sheet("Analysis")
+            row = write_labeled_block(ws, "Analysis Parameters", params_df, 1)
+            row = write_labeled_block(ws, "Theoretical Mass Combinations (all permutations)", theoretical_df, row)
+            write_labeled_block(
+                ws,
+                "Peak-by-Peak Verification (every candidate peak, matched or not)",
+                verification_df,
+                row,
+            )
     return buf.getvalue()
 
 
@@ -310,12 +374,20 @@ def run_analysis():
         if len(p.variants) > 1:
             n_display_cols.append(f"n_{p.label}_total")
 
+    verification_df = build_verification_table(
+        adc_df_all, theoretical, ppm_tolerance,
+        abundance_threshold=adc_min_fractional_abundance,
+    )
+
     return {
         "payload_defs": payload_defs,
         "payload_labels": [p.label for p in payload_defs],
         "dar": dar,
         "matched_with_contrib": matched_with_contrib,
         "base_masses": base_masses,
+        "base_mass_mode": base_mass_mode,
+        "theoretical": theoretical,
+        "verification_df": verification_df,
         "n_observed": len(adc_df_all),
         "n_candidates": len(adc_df),
         "n_matched": len(matched_with_contrib),
@@ -346,6 +418,9 @@ payload_labels = r["payload_labels"]
 dar = r["dar"]
 matched_with_contrib = r["matched_with_contrib"]
 base_masses = r["base_masses"]
+base_mass_mode = r["base_mass_mode"]
+theoretical = r["theoretical"]
+verification_df = r["verification_df"]
 n_observed = r["n_observed"]
 n_candidates = r["n_candidates"]
 n_matched = r["n_matched"]
@@ -369,6 +444,38 @@ with st.expander("Mass variants configured for this run"):
                 "MW (Da)": v.mw, "DAR weight": v.dar_weight,
             })
     st.dataframe(pd.DataFrame(variant_rows), use_container_width=True, hide_index=True)
+
+with st.expander("Peak-by-peak verification (every peak in the ADC file, matched or not)"):
+    st.caption(
+        "Every peak from the uploaded ADC file, with its closest theoretical species regardless of "
+        "whether it was actually accepted - so you can check *why* a peak wasn't counted (excluded by "
+        "the abundance threshold vs. simply too far in ppm from anything in the theoretical grid) "
+        "instead of it just silently disappearing. Green = matched. Yellow = excluded by the "
+        "fractional abundance threshold before matching was even attempted. Red = passed the "
+        "abundance threshold but its closest theoretical species was still outside the ppm tolerance "
+        "- if this happens for a peak you expected to match, it usually means a chemistry's max "
+        "conjugation count (or a mass variant's MW) needs adjusting, not that the peak is real noise."
+    )
+
+    def highlight_verification(row):
+        if row["matched"]:
+            color = "#D9EAD3"  # green
+        elif not row["passed_abundance_threshold"]:
+            color = "#FFF2CC"  # yellow
+        else:
+            color = "#F4CCCC"  # red
+        return [f"background-color: {color}" for _ in row]
+
+    verification_display_cols = [
+        "Average Mass", "Sum Intensity", "Fractional Abundance", "closest_species",
+        "closest_theoretical_mass", "delta_mass", "ppm_error",
+        "passed_abundance_threshold", "within_ppm_tolerance", "matched",
+    ]
+    verification_display_cols = [c for c in verification_display_cols if c in verification_df.columns]
+    st.dataframe(
+        verification_df[verification_display_cols].style.apply(highlight_verification, axis=1),
+        use_container_width=True,
+    )
 
 # --- Top-line metrics -------------------------------------------------
 cols = st.columns(len(payload_labels) + 1)
@@ -480,15 +587,24 @@ summary_df = pd.DataFrame(
     }
 )
 
+params_df = build_params_table(payload_defs, base_masses, base_mass_mode, ppm_tolerance, adc_min_fractional_abundance)
+
 col1, col2, col3 = st.columns(3)
 with col1:
     st.download_button(
         "Download DAR report (.xlsx)",
-        data=to_excel_bytes(summary_df, matched_with_contrib, drug_load_table),
+        data=to_excel_bytes(
+            summary_df, matched_with_contrib, drug_load_table,
+            params_df=params_df, theoretical_df=theoretical, verification_df=verification_df,
+        ),
         file_name="dar_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
-        help="Includes the drug-load distribution table as its own sheet.",
+        help=(
+            "Includes the drug-load distribution table and an \"Analysis\" sheet with every parameter "
+            "used, the full theoretical mass grid, and a peak-by-peak verification table - so results "
+            "can be checked by hand."
+        ),
     )
 with col2:
     img_buf = io.BytesIO()
